@@ -101,7 +101,8 @@ install -m 0644 "$SOURCE/deploy/nginx.conf" /etc/nginx/conf.d/freethinclint.conf
 nginx -t
 systemctl daemon-reload
 systemctl enable --now freethinclint.service freethinclint-update.timer
-systemctl reload nginx
+systemctl enable nginx
+systemctl reload-or-restart nginx
 sleep 2
 python3 - <<'PY'
 import json,urllib.request

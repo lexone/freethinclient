@@ -202,6 +202,7 @@ def run():
         except BlockingIOError:
             return
         if recover():
+            (CONTROL / "request.json").unlink(missing_ok=True)
             return
         request = CONTROL / "request.json"
         if not request.exists():

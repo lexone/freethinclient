@@ -13,6 +13,11 @@ Testes cobrem senha e versão, autorização/CSRF, gravação de perfil/wallpape
 assinatura válida e adulterada, checksum, caminhos inseguros em tar e rollback.
 Fixtures de assinatura usam chaves temporárias exclusivas dos testes.
 
+Na criação da versão 0.1.0, a suíte local passou em Windows (13 testes e um de
+recuperação exclusivo de Linux ignorado). A suíte de 14 testes passou no runner
+Ubuntu 24.04 do GitHub. O smoke test também verifica que nginx pode iniciar mesmo
+quando o pacote não o inicia automaticamente durante a instalação.
+
 CI executa testes no Ubuntu 24.04 e instala em contêiner descartável com systemd.
 O workflow de release testa o commit e exige chave de assinatura configurada.
 Resultados do Actions devem ser conferidos no GitHub; a presença do workflow
