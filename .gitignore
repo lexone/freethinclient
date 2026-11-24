@@ -1,0 +1,12 @@
+__pycache__/
+*.py[cod]
+.venv/
+dist/
+*.pem
+!keys/release-public.pem
+*.key
+*.db*
+*.env
+*.log
+.coverage
+secrets/

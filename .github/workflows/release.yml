@@ -1,0 +1,45 @@
+name: Signed release
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Stable version matching VERSION (e.g. 0.1.1)
+        required: true
+permissions:
+  contents: read
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    environment: release
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Validate version and run tests
+        env:
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: |
+          python3 -c 'import os,pathlib; from app.security import version_tuple; v=pathlib.Path("VERSION").read_text().strip(); version_tuple(v); assert v == os.environ["REQUESTED_VERSION"]'
+          python3 -m unittest discover -s tests -v
+          bash -n install.sh
+          node --check web/app.js
+      - name: Build signed package
+        env:
+          RELEASE_PRIVATE_KEY: ${{ secrets.RELEASE_PRIVATE_KEY }}
+        run: |
+          python3 - <<'PY'
+          import os,pathlib,subprocess
+          key=pathlib.Path(os.environ['RUNNER_TEMP'])/'release-private.pem'
+          secret=os.environ.get('RELEASE_PRIVATE_KEY','')
+          if not secret: raise SystemExit('Configure o secret RELEASE_PRIVATE_KEY no environment release.')
+          key.write_text(secret); key.chmod(0o600)
+          try:
+              subprocess.run(['python3','scripts/build-release.py','--key',str(key),'--repository',os.environ['GITHUB_REPOSITORY']],check=True)
+          finally:
+              key.unlink(missing_ok=True)
+          PY
+      - name: Publish stable release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REQUESTED_VERSION: ${{ inputs.version }}
+        run: gh release create "v$REQUESTED_VERSION" dist/* --target "$GITHUB_SHA" --title "FreeThinClint $REQUESTED_VERSION" --generate-notes

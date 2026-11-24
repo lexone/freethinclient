@@ -1,0 +1,33 @@
+name: Validate
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Python tests
+        run: python3 -m unittest discover -s tests -v
+      - name: Validate scripts and JavaScript
+        run: |
+          bash -n install.sh
+          node --check web/app.js
+          python3 -m compileall -q app scripts
+      - name: Installer smoke test in a disposable systemd container
+        run: |
+          docker run -d --name ftc-smoke --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD:/source:ro" ubuntu:24.04 /bin/bash -c 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y systemd systemd-sysv sudo && exec /sbin/init'
+          for attempt in $(seq 1 60); do
+            if docker exec ftc-smoke systemctl is-system-running 2>/dev/null | grep -Eq 'running|degraded'; then break; fi
+            sleep 2
+          done
+          docker exec ftc-smoke bash /source/install.sh --server-name 127.0.0.1
+          docker exec ftc-smoke bash /source/install.sh --server-name 127.0.0.1
+          docker exec ftc-smoke python3 -c 'import json,urllib.request; assert json.load(urllib.request.urlopen("http://127.0.0.1:8080/healthz"))["status"] == "ok"'
+          docker exec ftc-smoke systemctl is-active freethinclint freethinclint-update.timer nginx
+      - name: Smoke test diagnostics
+        if: failure()
+        run: docker exec ftc-smoke journalctl --no-pager -n 100 || true
+      - name: Clean smoke container
+        if: always()
+        run: docker rm -f ftc-smoke || true

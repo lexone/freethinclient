@@ -1,0 +1,22 @@
+[Unit]
+Description=FreeThinClint signed release update worker
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/freethinclint/current
+ExecStart=/usr/bin/python3 -B -m app.updater
+TimeoutStartSec=300
+UMask=0027
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/freethinclint /var/lib/freethinclint /var/lib/freethinclint-update /var/backups/freethinclint
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+
