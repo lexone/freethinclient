@@ -14,14 +14,14 @@ if os.geteuid() != 0:
 password = getpass.getpass("Nova senha (mínimo 12 caracteres): ")
 if password != getpass.getpass("Confirme: "):
     raise SystemExit("Senhas diferentes.")
-path = Path("/etc/freethinclint/panel.json")
+path = Path("/etc/freethinclient/panel.json")
 config = json.loads(path.read_text())
 config["admin_hash"] = password_hash(password)
 temporary = path.with_suffix(".new")
 temporary.write_text(json.dumps(config, indent=2))
 temporary.chmod(0o640)
 import shutil
-shutil.chown(temporary, user="root", group="freethinclint")
+shutil.chown(temporary, user="root", group="freethinclient")
 os.replace(temporary, path)
-subprocess.run(["systemctl", "restart", "freethinclint"], check=True)
+subprocess.run(["systemctl", "restart", "freethinclient"], check=True)
 print("Senha alterada e sessões encerradas.")

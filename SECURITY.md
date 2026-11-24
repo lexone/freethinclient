@@ -14,8 +14,8 @@ em memória (reinício limpa o limite). A conta inicial é administrativa única
 MFA, AD/LDAP, RBAC e vários administradores ainda não existem.
 
 Checksum não comprova origem. O manifesto precisa passar na assinatura com a
-chave pública fixada em `/etc/freethinclint/release-public.pem`. O GitHub token
-fica somente em `/etc/freethinclint/update.json`, root:root 0600. Downloads com
+chave pública fixada em `/etc/freethinclient/release-public.pem`. O GitHub token
+fica somente em `/etc/freethinclient/update.json`, root:root 0600. Downloads com
 redirecionamento nunca recebem Authorization no host de armazenamento.
 
 O GitHub Actions precisa da chave de assinatura para publicar versões instaláveis.

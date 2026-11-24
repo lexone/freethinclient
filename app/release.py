@@ -31,7 +31,7 @@ def verify_manifest(raw, signature, public_key, directory, repository):
     version_tuple(data.get("minimum_version"))
     if data.get("platform") != "ubuntu-24.04-amd64" or data.get("state_schema") != 1:
         raise ValueError("Plataforma ou esquema de dados incompatível")
-    if data.get("asset") != f"freethinclint-{data['version']}.tar.gz":
+    if data.get("asset") != f"freethinclient-{data['version']}.tar.gz":
         raise ValueError("Nome do pacote inválido")
     if not re.fullmatch(r"[a-f0-9]{64}", data.get("sha256", "")):
         raise ValueError("SHA-256 inválido")
@@ -77,3 +77,7 @@ def extract_package(path, destination, version):
     for required in ("app/server.py", "app/updater.py", "web/index.html"):
         if not (destination / required).is_file():
             raise ValueError("Pacote incompleto: " + required)
+    destination.chmod(0o755)
+    for directory in destination.rglob("*"):
+        if directory.is_dir():
+            directory.chmod(0o755)

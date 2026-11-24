@@ -10,19 +10,19 @@ from pathlib import Path
 
 if os.environ.get("FTC_DISPOSABLE_TEST") != "1" or not Path("/.dockerenv").exists():
     raise SystemExit("Este teste é exclusivo de um contêiner descartável do CI.")
-sys.path.insert(0, "/opt/freethinclint/current")
+sys.path.insert(0, "/opt/freethinclient/current")
 from app import updater
 
-subprocess.run(["systemctl", "stop", "freethinclint-update.timer"], check=True)
-subprocess.run(["runuser", "-u", "freethinclint", "--", "python3", "-c",
-                "from app.store import Store; Store('/var/lib/freethinclint').set('profile', {'organization':'CI persistence fixture'})"],
-               cwd="/opt/freethinclint/current", check=True)
+subprocess.run(["systemctl", "stop", "freethinclient-update.timer"], check=True)
+subprocess.run(["runuser", "-u", "freethinclient", "--", "python3", "-c",
+                "from app.store import Store; Store('/var/lib/freethinclient').set('profile', {'organization':'CI persistence fixture'})"],
+               cwd="/opt/freethinclient/current", check=True)
 
 
 def package(root, version, broken=False):
     source = root / ("source-" + version)
     import shutil
-    shutil.copytree("/opt/freethinclint/current", source)
+    shutil.copytree("/opt/freethinclient/current", source)
     (source / "VERSION").write_text(version + "\n")
     if broken:
         (source / "app" / "server.py").write_text("raise RuntimeError('Intentional CI health failure')\n")
@@ -51,7 +51,7 @@ with tempfile.TemporaryDirectory() as temporary:
     assert updater.healthy("0.1.1"), "Rollback did not restore working service"
     assert json.loads(updater.STATUS.read_text())["state"] == "rolled_back"
     assert not updater.PENDING.exists()
-    result = subprocess.run(["runuser", "-u", "freethinclint", "--", "python3", "-c",
-                             "from app.store import Store; assert Store('/var/lib/freethinclint').get('profile')['organization']=='CI persistence fixture'"],
-                            cwd="/opt/freethinclint/current", check=True)
+    result = subprocess.run(["runuser", "-u", "freethinclient", "--", "python3", "-c",
+                             "from app.store import Store; assert Store('/var/lib/freethinclient').get('profile')['organization']=='CI persistence fixture'"],
+                            cwd="/opt/freethinclient/current", check=True)
 print("Real systemd update, database permissions, health failure and rollback passed.")

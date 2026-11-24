@@ -56,7 +56,7 @@ class ControlServer(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
-    server_version = "FreeThinClint"
+    server_version = "FreeThinClient"
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):
@@ -222,8 +222,8 @@ class Handler(BaseHTTPRequestHandler):
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--config", default="/etc/freethinclint/panel.json")
-    parser.add_argument("--data", default="/var/lib/freethinclint")
+    parser.add_argument("--config", default="/etc/freethinclient/panel.json")
+    parser.add_argument("--data", default="/var/lib/freethinclient")
     parser.add_argument("--port", type=int, default=8080)
     args = parser.parse_args()
     config = json.loads(Path(args.config).read_text())

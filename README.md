@@ -1,4 +1,4 @@
-# FreeThinClint
+# FreeThinClient
 
 Painel de administração para um ambiente de thin clients Linux iniciado por PXE,
 com Chrome, Citrix Workspace e RDP. Servidor em VM VMware, DHCP existente no Windows Server.

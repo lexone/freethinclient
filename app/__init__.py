@@ -1,1 +1,1 @@
-"""FreeThinClint control plane."""
+"""FreeThinClient control plane."""

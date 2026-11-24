@@ -1,11 +1,11 @@
 [Unit]
-Description=Check FreeThinClint administrator update requests
+Description=Check FreeThinClient administrator update requests
 
 [Timer]
 OnBootSec=20s
 OnUnitInactiveSec=15s
 AccuracySec=1s
-Unit=freethinclint-update.service
+Unit=freethinclient-update.service
 
 [Install]
 WantedBy=timers.target

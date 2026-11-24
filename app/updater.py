@@ -19,12 +19,12 @@ from app.github import github_get, valid_repository
 from app.release import MAX_PACKAGE, extract_package, validate_package, verify_manifest
 from app.security import version_tuple
 
-ROOT = Path(os.environ.get("FTC_INSTALL_ROOT", "/opt/freethinclint"))
-STATE = Path(os.environ.get("FTC_DATA_ROOT", "/var/lib/freethinclint"))
+ROOT = Path(os.environ.get("FTC_INSTALL_ROOT", "/opt/freethinclient"))
+STATE = Path(os.environ.get("FTC_DATA_ROOT", "/var/lib/freethinclient"))
 CONTROL = STATE / "updates"
-STATUS = Path(os.environ.get("FTC_STATUS_ROOT", "/var/lib/freethinclint-update")) / "status.json"
-CONFIG = Path(os.environ.get("FTC_UPDATE_CONFIG", "/etc/freethinclint/update.json"))
-BACKUPS = Path(os.environ.get("FTC_BACKUP_ROOT", "/var/backups/freethinclint"))
+STATUS = Path(os.environ.get("FTC_STATUS_ROOT", "/var/lib/freethinclient-update")) / "status.json"
+CONFIG = Path(os.environ.get("FTC_UPDATE_CONFIG", "/etc/freethinclient/update.json"))
+BACKUPS = Path(os.environ.get("FTC_BACKUP_ROOT", "/var/backups/freethinclient"))
 PENDING = ROOT / "pending-update.json"
 
 
@@ -50,7 +50,7 @@ def status(state, **fields):
 
 
 def systemctl(action):
-    subprocess.run(["systemctl", action, "freethinclint.service"], check=True, timeout=45, capture_output=True)
+    subprocess.run(["systemctl", action, "freethinclient.service"], check=True, timeout=45, capture_output=True)
 
 
 def healthy(version):
@@ -138,7 +138,7 @@ def recover():
     restored = ROOT / "restored.db"
     shutil.copy2(backup / "state.db", restored)
     if os.name == "posix":
-        shutil.chown(restored, user="freethinclint", group="freethinclint")
+        shutil.chown(restored, user="freethinclient", group="freethinclient")
     os.replace(restored, STATE / "state.db")
     systemctl("start")
     if not healthy((old / "VERSION").read_text().strip()):
@@ -163,7 +163,8 @@ def apply_update(manifest, download):
         validate_package(package, manifest)
         extracted = staging / "release"
         extract_package(package, extracted, manifest["version"])
-        subprocess.run(["python3", "-m", "compileall", "-q", str(extracted / "app")], check=True, timeout=30)
+        subprocess.run(["python3", "-m", "compileall", "-q", str(extracted / "app")], check=True, timeout=30,
+                       env={**os.environ, "PYTHONPYCACHEPREFIX": str(staging / "bytecode")})
         dest = ROOT / "releases" / (manifest["version"] + "-" + manifest["sha256"][:12])
         if dest.exists():
             raise ValueError("Destino já existe; confira tentativa anterior antes de repetir")
@@ -175,7 +176,7 @@ def apply_update(manifest, download):
     try:
         with closing(sqlite3.connect(STATE / "state.db")) as source, closing(sqlite3.connect(backup / "state.db")) as target:
             source.backup(target)
-        for file in (STATE / "wallpaper.bin", Path("/etc/freethinclint/panel.json")):
+        for file in (STATE / "wallpaper.bin", Path("/etc/freethinclient/panel.json")):
             if file.exists():
                 shutil.copy2(file, backup / file.name)
         atomic_json(PENDING, {"previous": str(previous), "backup": str(backup)}, 0o600)

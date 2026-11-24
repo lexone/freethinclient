@@ -68,7 +68,7 @@ class ReleaseTests(unittest.TestCase):
     def manifest(self):
         return {"schema": 1, "repository": "lexone/freethinclient", "version": "0.2.0", "minimum_version": "0.1.0",
                 "platform": "ubuntu-24.04-amd64", "state_schema": 1,
-                "asset": "freethinclint-0.2.0.tar.gz", "sha256": "a" * 64, "size": 100}
+                "asset": "freethinclient-0.2.0.tar.gz", "sha256": "a" * 64, "size": 100}
 
     def sign(self, manifest):
         raw = json.dumps(manifest).encode()

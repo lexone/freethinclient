@@ -16,7 +16,7 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
 def github_get(path, token, *, binary=False, limit=2_000_000):
     if not path.startswith("/repos/") or ".." in path:
         raise ValueError("Endpoint GitHub inválido")
-    headers = {"User-Agent": "freethinclint", "Accept": "application/octet-stream" if binary else "application/vnd.github+json",
+    headers = {"User-Agent": "freethinclient", "Accept": "application/octet-stream" if binary else "application/vnd.github+json",
                "X-GitHub-Api-Version": "2022-11-28"}
     if token:
         headers["Authorization"] = "Bearer " + token.strip()
@@ -33,7 +33,7 @@ def github_get(path, token, *, binary=False, limit=2_000_000):
         if parsed.scheme != "https" or parsed.hostname not in allowed or parsed.username or parsed.port not in (None, 443):
             raise ValueError("Redirecionamento de download não autorizado")
         # A new request with NO Authorization. No second redirect is allowed.
-        response = opener.open(urllib.request.Request(location, headers={"User-Agent": "freethinclint"}), timeout=60)
+        response = opener.open(urllib.request.Request(location, headers={"User-Agent": "freethinclient"}), timeout=60)
     with response:
         data = response.read(limit + 1)
     if len(data) > limit:

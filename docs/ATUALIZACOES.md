@@ -4,7 +4,7 @@
 
 O instalador gera uma chave RSA de 3072 bits no servidor. Somente a pública fica
 disponível para verificação; a privada permanece em
-`/root/freethinclint-signing/release-private.pem` (0600).
+`/root/freethinclient-signing/release-private.pem` (0600).
 
 1. Faça backup criptografado da privada em um cofre.
 2. No GitHub, crie o environment **release** e configure revisores obrigatórios.
@@ -15,7 +15,7 @@ disponível para verificação; a privada permanece em
 Com GitHub CLI autenticado no servidor, é possível enviar sem exibir a chave:
 
 ```bash
-sudo sh -c 'gh secret set RELEASE_PRIVATE_KEY --repo lexone/freethinclient --env release < /root/freethinclint-signing/release-private.pem'
+sudo sh -c 'gh secret set RELEASE_PRIVATE_KEY --repo lexone/freethinclient --env release < /root/freethinclient-signing/release-private.pem'
 ```
 
 O CLI precisa estar autenticado no contexto usado pelo sudo; essa configuração
@@ -40,7 +40,7 @@ checkout revisado; a confiança inicial no código/chave depende do administrado
 É possível assinar fora do Actions no servidor ou em máquina segura:
 
 ```bash
-sudo python3 scripts/build-release.py --key /root/freethinclint-signing/release-private.pem
+sudo python3 scripts/build-release.py --key /root/freethinclient-signing/release-private.pem
 # Publique os três arquivos dist/* como assets da mesma release vX.Y.Z.
 ```
 

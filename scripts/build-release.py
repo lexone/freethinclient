@@ -28,7 +28,7 @@ def main():
         raise SystemExit("Versão mínima maior que a versão publicada")
     valid_repository(args.repository)
     args.output.mkdir(parents=True, exist_ok=True)
-    package = args.output / f"freethinclint-{version}.tar.gz"
+    package = args.output / f"freethinclient-{version}.tar.gz"
     with tarfile.open(package, "w:gz") as archive:
         for name in ("VERSION", "README.md", "CHANGELOG.md", "SECURITY.md", "install.sh", "app", "web", "scripts", "deploy", "docs", "tests"):
             path = ROOT / name

@@ -42,4 +42,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           REQUESTED_VERSION: ${{ inputs.version }}
-        run: gh release create "v$REQUESTED_VERSION" dist/* --target "$GITHUB_SHA" --title "FreeThinClint $REQUESTED_VERSION" --generate-notes
+        run: gh release create "v$REQUESTED_VERSION" dist/* --target "$GITHUB_SHA" --title "FreeThinClient $REQUESTED_VERSION" --generate-notes

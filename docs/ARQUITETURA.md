@@ -7,7 +7,7 @@ Não é VDI hospedado nesta VM e não cria licenças RDS/Citrix.
 | Componente | Execução e função |
 |---|---|
 | nginx | TLS na porta 8443, proxy para loopback |
-| Painel Python | Usuário freethinclint; perfil, wallpaper e pedidos de update |
+| Painel Python | Usuário freethinclient; perfil, wallpaper e pedidos de update |
 | SQLite | Estado persistente e histórico administrativo |
 | Atualizador Python | root, timer a cada 15 s; um processo por vez via flock |
 | GitHub | Fonte das releases e código; público ou privado com token |
@@ -15,16 +15,16 @@ Não é VDI hospedado nesta VM e não cria licenças RDS/Citrix.
 
 | Caminho | Proprietário / finalidade |
 |---|---|
-| `/opt/freethinclint/releases` | root; código de cada versão |
-| `/opt/freethinclint/current` | root; link para versão ativa |
-| `/opt/freethinclint/pending-update.json` | root; journal de recuperação |
-| `/etc/freethinclint/panel.json` | root:freethinclint 0640; hash administrativo |
-| `/etc/freethinclint/update.json` | root:root 0600; repositório e token |
-| `/etc/freethinclint/release-public.pem` | Chave pública fixada localmente |
-| `/root/freethinclint-signing` | root 0700; chave privada de publicação |
-| `/var/lib/freethinclint` | Usuário web; SQLite, wallpaper e fila de pedidos |
-| `/var/lib/freethinclint-update` | root; resultado de updates, legível pelo painel |
-| `/var/backups/freethinclint` | root 0700; snapshots antes dos updates |
+| `/opt/freethinclient/releases` | root; código de cada versão |
+| `/opt/freethinclient/current` | root; link para versão ativa |
+| `/opt/freethinclient/pending-update.json` | root; journal de recuperação |
+| `/etc/freethinclient/panel.json` | root:freethinclient 0640; hash administrativo |
+| `/etc/freethinclient/update.json` | root:root 0600; repositório e token |
+| `/etc/freethinclient/release-public.pem` | Chave pública fixada localmente |
+| `/root/freethinclient-signing` | root 0700; chave privada de publicação |
+| `/var/lib/freethinclient` | Usuário web; SQLite, wallpaper e fila de pedidos |
+| `/var/lib/freethinclient-update` | root; resultado de updates, legível pelo painel |
+| `/var/backups/freethinclient` | root 0700; snapshots antes dos updates |
 
 A página não executa apt, git pull ou comandos arbitrários. O botão de update
 cria um pedido JSON completo com hard link atômico, e o worker root verifica

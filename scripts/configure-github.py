@@ -7,7 +7,7 @@ from pathlib import Path
 
 if os.geteuid() != 0:
     raise SystemExit("Execute com sudo.")
-path = Path("/etc/freethinclint/update.json")
+path = Path("/etc/freethinclient/update.json")
 config = json.loads(path.read_text())
 config["github_token"] = getpass.getpass("Token GitHub (Enter para acesso público sem token): ").strip()
 temporary = path.with_suffix(".new")

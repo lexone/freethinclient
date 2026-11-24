@@ -7,8 +7,8 @@ acesso ao VMware ou ao Windows DHCP. Mantém portas existentes do nginx e cria
 um virtual host próprio em 8443. Não altera regras de firewall automaticamente.
 
 ```bash
-systemctl status freethinclint freethinclint-update.timer nginx
-journalctl -u freethinclint -u freethinclint-update --since today
+systemctl status freethinclient freethinclient-update.timer nginx
+journalctl -u freethinclient -u freethinclient-update --since today
 curl http://127.0.0.1:8080/healthz
 ```
 
@@ -16,7 +16,7 @@ Em HTTPS, confira a impressão digital do certificado pelo console antes de
 confiar no certificado local do piloto:
 
 ```bash
-sudo openssl x509 -in /etc/freethinclint/tls.crt -noout -fingerprint -sha256
+sudo openssl x509 -in /etc/freethinclient/tls.crt -noout -fingerprint -sha256
 ```
 
 Uma segunda execução completa do instalador sai sem modificar a instalação.
@@ -56,25 +56,25 @@ de boot serão configurados somente depois do endereço definitivo.
 
 Os backups do update não substituem backup periódico externo. Para cópia fria,
 pare painel e timer, confirme que o worker de atualização não está ativo,
-copie `/var/lib/freethinclint`, `/etc/freethinclint`, `/opt/freethinclint` e
-`/var/backups/freethinclint` preservando permissões e symlinks. Guarde a chave
+copie `/var/lib/freethinclient`, `/etc/freethinclient`, `/opt/freethinclient` e
+`/var/backups/freethinclient` preservando permissões e symlinks. Guarde a chave
 privada separadamente em cofre. Reinicie o painel e o timer após a cópia.
 Proteja os backups, pois contêm hash administrativo e, em `/etc`, token GitHub.
 
 ## Recuperação manual
 
 Pelo console do VMware, mantenha uma cópia dos arquivos atuais. Inspecione
-`/opt/freethinclint/pending-update.json`, diretórios de releases e backups.
+`/opt/freethinclient/pending-update.json`, diretórios de releases e backups.
 Para acionar a recuperação automática pendente:
 
 ```bash
-sudo systemctl start freethinclint-update.service
-sudo journalctl -u freethinclint-update -n 80 --no-pager
+sudo systemctl start freethinclient-update.service
+sudo journalctl -u freethinclient-update -n 80 --no-pager
 ```
 
 Se precisar restaurar manualmente, pare timer e painel, restaure o link `current`
 para uma release conhecida e o banco do snapshot correspondente. Remova WAL/SHM
-apenas com o serviço parado; mantenha propriedade freethinclint no banco.
+apenas com o serviço parado; mantenha propriedade freethinclient no banco.
 Confirme `/healthz` antes de remover o journal pendente e reativar o timer.
 Escolher arbitrariamente um banco de outro esquema não é suportado.
 
