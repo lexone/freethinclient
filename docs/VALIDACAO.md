@@ -19,6 +19,10 @@ Ubuntu 24.04 do GitHub. O smoke test também verifica que nginx pode iniciar mes
 quando o pacote não o inicia automaticamente durante a instalação.
 
 CI executa testes no Ubuntu 24.04 e instala em contêiner descartável com systemd.
+O contêiner também executa um update real de teste, confirma persistência e
+permissões do banco e aplica uma versão defeituosa para verificar rollback.
+`tests/smoke_update.py` recusa execução fora de contêiner explicitamente marcado
+como descartável. Não execute esse teste no servidor da empresa.
 O workflow de release testa o commit e exige chave de assinatura configurada.
 Resultados do Actions devem ser conferidos no GitHub; a presença do workflow
 não comprova que o ambiente de destino passou na homologação.

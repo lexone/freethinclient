@@ -4,6 +4,7 @@ Only this process reads GitHub credentials or changes /opt. It runs on a timer,
 serializes updates with flock and journals a pending transaction before switching.
 """
 import json
+from contextlib import closing
 import os
 import platform
 import shutil
@@ -172,7 +173,7 @@ def apply_update(manifest, download):
     status("applying", target=manifest["version"])
     systemctl("stop")
     try:
-        with sqlite3.connect(STATE / "state.db") as source, sqlite3.connect(backup / "state.db") as target:
+        with closing(sqlite3.connect(STATE / "state.db")) as source, closing(sqlite3.connect(backup / "state.db")) as target:
             source.backup(target)
         for file in (STATE / "wallpaper.bin", Path("/etc/freethinclint/panel.json")):
             if file.exists():
