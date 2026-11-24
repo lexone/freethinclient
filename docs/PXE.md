@@ -1,40 +1,33 @@
-# Plano de integração PXE (ainda não implementado)
+# PXE no piloto 0.2
 
-O instalador 0.1.0 não inicia DHCP, ProxyDHCP, TFTP, NFS ou iPXE. O Windows Server
-continua responsável por endereços. Não altere opções globais de boot sem
-confirmar a arquitetura dos clientes e se há WDS/SCCM no mesmo segmento.
+A receita de build e publicação está em [CLIENTES.md](CLIENTES.md).
+O instalador do painel não ativa DHCP, ProxyDHCP, TFTP ou NFS.
 
-## Informações necessárias
+`scripts/build-client.sh` gera a ISO e kernel/initrd/SquashFS em um builder
+Linux. `scripts/setup-boot.sh` publica os artefatos via HTTP em TCP 8081 e
+os inicializadores iPXE via TFTP. O Windows Server mantém as concessões DHCP.
 
-- IP definitivo da VM, prefixo, gateway, DNS e VLAN.
-- Windows Server DHCP: versão, escopo e permissões administrativas.
-- BIOS/UEFI e Secure Boot do PC piloto; CPU amd64, RAM e adaptador de rede.
-- VLANs dos clientes, roteamento, relay/IP helper e serviços PXE existentes.
-- URL StoreFront/Gateway Citrix e destino RDP para homologação.
-- Recursos necessários: áudio, monitores, USB, impressora, webcam e Teams.
+Antes de ativar boot no segmento, identifique:
 
-## Implementação prevista
+- IP, VLAN, prefixo, gateway e DNS definitivos da VM.
+- Escopo/versão do Windows DHCP, relay/IP helper e existência de WDS/SCCM.
+- Arquitetura BIOS/UEFI, Secure Boot e hardware do PC piloto.
+- Acesso dos clientes ao painel HTTPS e ao servidor de imagem.
+- Persistência da identidade do agente, ou reconhecimento por MAC explicitamente
+  habilitado em grupo para uma rede de boot confiável.
 
-1. Criar imagem Ubuntu mínima com desktop leve e agente de configurações.
-2. Integrar Chrome e FreeRDP; instalar Citrix Workspace de fonte oficial com
-   dependências compatíveis e respeitando licença/redistribuição.
-3. Preparar boot BIOS e UEFI, distribuição da imagem e escrita temporária
-   individual em RAM. Homologar Secure Boot separadamente.
-4. Integrar Windows DHCP com servidor de boot, escolhendo políticas ou
-   ProxyDHCP/relay conforme a topologia, sem disputar concessões IP.
-5. Implementar registro/aprovação de dispositivos, identidade por credencial
-   própria, grupos e aplicação do perfil/wallpaper ao desktop Linux.
-6. Validar reconexão, limpeza de dados ao reiniciar e ausência de credenciais
-   compartilhadas nos clientes. Token GitHub nunca entra na imagem.
-7. Testar um PC, depois um grupo pequeno e boot simultâneo de mais de 50 PCs.
+Não use um único arquivo de boot para BIOS e UEFI. Clientes que já carregaram
+iPXE precisam receber o script HTTP, evitando loop de chainloading.
+A receita usa um único sistema Linux; o perfil é aplicado pelo agente depois
+da aprovação. A escolha de origem no grupo não reconfigura o firmware nem
+instala o sistema no disco.
 
-## Critérios de aceite
+## Estado de validação
 
-Clientes iniciam sem HD; abrem Chrome, Citrix e RDP; recebem wallpaper definido
-no painel; respeitam restrições de interface; não alteram DHCP existente;
-retornam ao estado limpo após reiniciar. Medir tempo de boot, throughput,
-memória, rede, concorrência e falha do servidor de imagem.
+A presença dos arquivos de imagem pode ser consultada no painel. Isso não
+comprova que o DHCP, a arquitetura, os drivers ou o Secure Boot estão corretos.
+A versão não declara automaticamente `pxe_verified=true`.
 
-Referências: [iPXE chainloading](https://ipxe.org/howto/chainloading),
-[Citrix Linux requirements](https://docs.citrix.com/us/en/citrix-workspace-app-for-linux/system-requirements.html),
-[Microsoft PXE](https://learn.microsoft.com/en-us/troubleshoot/mem/configmgr/os-deployment/understand-pxe-boot).
+Homologue primeiro uma VM cliente e depois um PC real; só então amplie a frota.
+Referências: [iPXE](https://ipxe.org/howto/chainloading),
+[live-build](https://manpages.debian.org/bookworm/live-build/lb_config.1.en.html).

@@ -30,7 +30,7 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     package = args.output / f"freethinclient-{version}.tar.gz"
     with tarfile.open(package, "w:gz") as archive:
-        for name in ("VERSION", "README.md", "CHANGELOG.md", "SECURITY.md", "install.sh", "app", "web", "scripts", "deploy", "docs", "tests"):
+        for name in ("VERSION", "README.md", "CHANGELOG.md", "SECURITY.md", "install.sh", "app", "web", "client", "scripts", "deploy", "docs", "tests"):
             path = ROOT / name
             files = sorted(path.rglob("*")) if path.is_dir() else [path]
             for file in files:

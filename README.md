@@ -1,81 +1,84 @@
 # FreeThinClient
 
-Painel de administração para um ambiente de thin clients Linux iniciado por PXE,
-com Chrome, Citrix Workspace e RDP. Servidor em VM VMware, DHCP existente no Windows Server.
+Gerenciamento de thin clients Linux com painel web em português, grupos,
+perfis de inicialização e desktop Blue Workspace.
 
-**Estado: 0.1.0, piloto do plano de controle.** Esta versão instala o painel,
-salva um perfil global e o wallpaper, e implementa atualizações assinadas.
-Ela **ainda não gera a imagem Linux dos clientes, ativa PXE nem distribui configurações**.
-Não é uma instalação do produto openthinclient e não tem vínculo com ele.
+**Versão 0.2.0 — piloto.** O painel gerencia grupos e dispositivos, e o agente
+recebe configurações após aprovação. Há uma receita de imagem Linux e de
+publicação PXE; a ISO deve ser gerada em Linux e o boot validado em uma VM/PC.
+Ainda não é uma substituição completa do openthinclient.
 
-## Instalação no servidor
+## Funcionalidades
 
-Ubuntu Server **24.04 LTS amd64** novo; ponto de partida do piloto:
-4 vCPU, 8 GB RAM e 100 GB de disco. A capacidade de 50+ clientes depende do
-teste de boot simultâneo e do futuro mecanismo de distribuição da imagem.
+- Abas: visão geral, máquinas, grupos, imagens/boot, aparência, atualizações e atividade.
+- Grupos com desktop, navegador, quiosque, portal Citrix ou RDP.
+- Compatibilidade BIOS/UEFI e origem PXE/mídia local por grupo.
+- Cadastro por MAC, aprovação, status online e credenciais individuais.
+- Reaplicar perfil, reiniciar e desligar através do agente.
+- Desktop azul, atalhos próprios, ícones Papirus e wallpaper da organização.
+- Build Debian 12 amd64 com XFCE, Chromium e FreeRDP.
+- Atualizações do painel assinadas, backup SQLite e rollback automático.
+
+## Instalação do painel
+
+Ubuntu Server **24.04 LTS amd64**. Referência para o piloto: 4 vCPU, 8 GB RAM,
+100 GB de disco. O dimensionamento para 50+ clientes depende de homologação.
 
 ```bash
 sudo apt update
 sudo apt install -y git
 git clone https://github.com/lexone/freethinclient.git
 cd freethinclient
-sudo bash install.sh --server-name IP_OU_DNS_DA_VM
+sudo bash install.sh --server-name "$(hostname -I | awk '{print $1}')"
 ```
 
-Substitua `IP_OU_DNS_DA_VM` pelo endereço atual. Revise o código antes de executar
-com sudo. A senha aleatória do usuário `admin` aparece uma única vez no terminal.
-Abra **https://IP_OU_DNS_DA_VM:8443**. O instalador cria certificado local;
-valide a impressão digital no console e substitua pela CA da empresa em produção.
+Confira o endereço detectado em uma VM com várias interfaces. A senha inicial
+aleatória do usuário `admin` aparece uma vez no terminal. Acesse
+`https://IP_DA_VM:8443`. O instalador cria um certificado local; confira sua
+impressão digital no console e use a CA da empresa em produção. Não altera
+DHCP, VLAN, PXE ou firewall. Reexecutar o instalador preserva a instalação.
 
-O script instala dependências, usuário sem shell, serviços systemd, nginx/TLS,
-SQLite e o verificador de updates. Não muda IP, VLAN, DHCP, firewall ou PXE.
-Uma segunda execução preserva a instalação existente e não redefine senhas.
+### Atualizar instalação existente
 
-## O que funciona nesta versão
+Aplique um checkout revisado com:
 
-- Login administrativo, hash scrypt, sessão com validade de uma hora e CSRF.
-- Perfil global: organização, nome do grupo, Chrome, URL Citrix e destino RDP.
-- Upload de wallpaper PNG/JPEG de até 5 MB e prévia autenticada.
-- Consulta de releases estáveis GitHub; token opcional para repositório privado.
-- Update pelo painel com assinatura RSA/SHA-256, hash/tamanho do pacote,
-  compatibilidade, backup SQLite, troca de diretório e teste de saúde.
-- Rollback automático e recuperação de transação pendente após reinício.
-- Registro de alterações administrativas e status persistido do atualizador.
+```bash
+sudo bash scripts/upgrade-local.sh
+```
 
-Não há máquinas fictícias cadastradas. Os campos do perfil ficam armazenados
-para a futura integração com os clientes; não alteram sessões Windows ou Citrix.
+A atualização local preserva a senha, faz backup e testa a saúde do serviço.
+Para distribuição regular, use as releases assinadas descritas na documentação.
 
-## Próxima etapa: piloto PXE
+## Imagem e primeiro cliente
 
-Precisaremos de IP definitivo, sub-rede/VLAN, versão do Windows DHCP, existência
-de WDS/SCCM, um PC de teste e informação BIOS/UEFI/Secure Boot.
-A imagem dos clientes deverá incluir desktop leve, Chrome, cliente RDP e o
-instalador Citrix obtido conforme a licença do fabricante. Multi-grupos,
-enrollment de clientes, aplicação do wallpaper e comandos remotos ainda não
-foram implementados. Veja [plano PXE](docs/PXE.md).
+Leia [o guia dos clientes](docs/CLIENTES.md). Ele cobre geração da ISO,
+aprovação do primeiro PC, credenciais persistentes ou reconhecimento opcional
+por MAC para clientes sem disco, e publicação HTTP/TFTP integrada ao DHCP Windows.
+
+Citrix Workspace precisa ser instalado de fonte oficial na imagem. O build
+básico abre o portal Citrix, mas não inclui o pacote ICA. AD/SSO, VNC,
+impressoras gerenciadas, Secure Boot e instalação permanente em disco ainda
+precisam de implementação/homologação. Não há máquinas fictícias no painel.
 
 ## Documentação
 
 | Documento | Conteúdo |
 |---|---|
-| [Arquitetura](docs/ARQUITETURA.md) | Componentes, permissões e diretórios |
-| [Atualizações](docs/ATUALIZACOES.md) | Chaves, releases, validação, rollback |
-| [Operação](docs/OPERACAO.md) | Instalação, troca de endereço, backup, recuperação |
-| [PXE](docs/PXE.md) | Integração planejada com Windows DHCP |
-| [Validação](docs/VALIDACAO.md) | Testes automatizados e homologação na VM |
-| [Segurança](SECURITY.md) | Limites, credenciais e modelo de confiança |
-| [Changelog](CHANGELOG.md) | Histórico de versões |
+| [Clientes e imagem](docs/CLIENTES.md) | Build, agente, grupos, boot e limitações do piloto |
+| [Arquitetura](docs/ARQUITETURA.md) | Componentes e diretórios |
+| [Atualizações](docs/ATUALIZACOES.md) | Chaves, releases, validação e rollback |
+| [Operação](docs/OPERACAO.md) | Senha, endereço, backup e recuperação |
+| [PXE](docs/PXE.md) | Integração com DHCP existente |
+| [Segurança](SECURITY.md) | Credenciais e confiança |
 
-## Desenvolvimento
-
-Python 3.11+ para testes; Python 3.12 do Ubuntu 24.04 no servidor. Sem pip ou
-dependências Python externas. OpenSSL é necessário para assinatura/verificação.
+## Validação
 
 ```bash
 python3 -m unittest discover -s tests -v
-bash -n install.sh
+bash -n install.sh scripts/build-client.sh scripts/setup-boot.sh scripts/upgrade-local.sh
 node --check web/app.js
+node --check web/fleet.js
 ```
 
-O CI inclui teste do instalador em contêiner systemd descartável. O teste em
-VMware e em hardware PXE real continua necessário antes de produção.
+O CI valida painel, verificação de releases e instalação em contêiner systemd.
+Isso não substitui o teste da ISO e do hardware de boot.

@@ -13,7 +13,9 @@ jobs:
         run: |
           bash -n install.sh
           node --check web/app.js
-          python3 -m compileall -q app scripts
+          node --check web/fleet.js
+          bash -n scripts/build-client.sh scripts/setup-boot.sh scripts/upgrade-local.sh
+          python3 -m compileall -q app scripts client
       - name: Installer smoke test in a disposable systemd container
         run: |
           docker run -d --name ftc-smoke --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD:/source:ro" ubuntu:24.04 /bin/bash -c 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y systemd systemd-sysv sudo && exec /sbin/init'

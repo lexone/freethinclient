@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 
 from app.security import password_ok, version_tuple
 from app.store import Store
+from app import fleet
 
 BASE = Path(__file__).resolve().parents[1]
 VERSION = (BASE / "VERSION").read_text().strip()
@@ -49,6 +50,7 @@ class ControlServer(ThreadingHTTPServer):
     def __init__(self, address, root, configuration):
         super().__init__(address, Handler)
         self.store = Store(root)
+        fleet.initialize(self.store)
         self.configuration = configuration
         self.sessions = {}
         self.attempts = {}
@@ -104,7 +106,15 @@ class Handler(BaseHTTPRequestHandler):
             with self.server.store.connect() as db:
                 db.execute("SELECT 1").fetchone()
             return self.reply(200, {"status": "ok", "version": VERSION, "state_schema": 1})
-        if path in ("/", "/index.html", "/app.js", "/style.css"):
+        if path.startswith('/assets/'):
+            name = path.removeprefix('/assets/')
+            if not re.fullmatch(r'[a-z0-9-]+\.svg', name):
+                return self.reply(404, {'error': 'Não encontrado'})
+            file = BASE / 'web' / 'assets' / name
+            if not file.is_file():
+                return self.reply(404, {'error': 'Não encontrado'})
+            return self.reply(200, file.read_bytes(), mime='image/svg+xml')
+        if path in ("/", "/index.html", "/app.js", "/fleet.js", "/style.css", "/blue.css"):
             file = BASE / "web" / ("index.html" if path == "/" else path[1:])
             mime = "text/html; charset=utf-8" if file.suffix == ".html" else "text/javascript" if file.suffix == ".js" else "text/css"
             return self.reply(200, file.read_bytes(), mime=mime)
@@ -120,6 +130,9 @@ class Handler(BaseHTTPRequestHandler):
                                    "profile": state.get("profile", validate_profile({})),
                                    "wallpaper": state.get("wallpaper"), "update": update,
                                    "events": state.events(), "pxe_ready": False})
+        if path == '/api/fleet':
+            return self.reply(200, {'groups': fleet.groups(self.server.store), 'devices': fleet.devices(self.server.store),
+                                   'boot': self.boot_status()})
         if path == "/api/wallpaper":
             file = self.server.store.root / "wallpaper.bin"
             meta = self.server.store.get("wallpaper")
@@ -147,17 +160,65 @@ class Handler(BaseHTTPRequestHandler):
     def post(self, path, data):
         if path == "/api/login":
             return self.login(data)
+        if path == '/api/client/enroll':
+            peer = self.headers.get('X-Real-IP', self.client_address[0])
+            key, now = 'enroll:' + peer, time.time()
+            with self.server.lock:
+                start, count = self.server.attempts.get(key, (now, 0))
+                if start < now - 900:
+                    start, count = now, 0
+                if count >= 20:
+                    return self.reply(429, {'error': 'Muitas solicitações de cadastro. Aguarde 15 minutos.'})
+                self.server.attempts[key] = (start, count + 1)
+            return self.reply(201, fleet.enroll(self.server.store, data))
+        if path == '/api/client/heartbeat':
+            token = self.headers.get('Authorization', '').removeprefix('Bearer ')
+            identity = fleet.authenticate(self.server.store, token)
+            if not identity:
+                return self.reply(401, {'error': 'Identidade do agente inválida'})
+            result = fleet.heartbeat(self.server.store, identity, data)
+            if result.get('approved'):
+                meta = self.server.store.get('wallpaper')
+                result['wallpaper'] = meta
+            return self.reply(200, result)
+        if path == '/api/client/wallpaper':
+            token = self.headers.get('Authorization', '').removeprefix('Bearer ')
+            identity = fleet.authenticate(self.server.store, token)
+            if not identity or not fleet.heartbeat(self.server.store, identity, {}).get('approved'):
+                return self.reply(403, {'error': 'Máquina não aprovada'})
+            file = self.server.store.root / 'wallpaper.bin'
+            meta = self.server.store.get('wallpaper')
+            if file.is_file() and meta:
+                return self.reply(200, file.read_bytes(), mime=meta['mime'])
+            return self.reply(404, {'error': 'Wallpaper não definido'})
         session = self.session(mutate=True)
         if not session:
             return self.reply(403, {"error": "Sessão ou proteção CSRF inválida"})
         state = self.server.store
+        if path == '/api/groups/save':
+            return self.reply(200, {'ok': True, 'id': fleet.save_group(state, data)})
+        if path == '/api/groups/delete':
+            fleet.delete_group(state, fleet.text(data.get('id', ''), 40))
+            return self.reply(200, {'ok': True})
+        if path == '/api/devices/assign':
+            fleet.assign(state, data)
+            return self.reply(200, {'ok': True})
+        if path == '/api/devices/command':
+            fleet.command(state, data)
+            return self.reply(202, {'ok': True})
+        if path == '/api/devices/delete':
+            identity = fleet.text(data.get('id', ''), 40)
+            with state.connect() as db:
+                db.execute('DELETE FROM fleet_devices WHERE id=?', (identity,))
+            state.audit('admin', 'Cadastro e credencial removidos: ' + identity)
+            return self.reply(200, {'ok': True})
         if path == "/api/logout":
             with self.server.lock:
                 token = http.cookies.SimpleCookie(self.headers.get("Cookie", ""))["session"].value
                 self.server.sessions.pop(token, None)
             return self.reply(200, {"ok": True}, cookie="session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0")
         if path == "/api/profile":
-            profile = validate_profile(data)
+            profile = validate_profile({**state.get('profile', {}), **data})
             state.set("profile", profile)
             state.audit("admin", "Perfil salvo: " + profile["group"])
             return self.reply(200, {"ok": True})
@@ -192,6 +253,14 @@ class Handler(BaseHTTPRequestHandler):
             state.audit("admin", "Atualização solicitada: " + action)
             return self.reply(202, {"ok": True, "message": "Solicitação enviada ao serviço de atualização"})
         return self.reply(404, {"error": "Não encontrado"})
+
+    def boot_status(self):
+        root = Path(self.server.configuration.get('boot_root', '/srv/freethinclient/boot'))
+        required = ('vmlinuz', 'initrd.img', 'filesystem.squashfs', 'boot.ipxe')
+        return {'files': {name: (root / name).is_file() for name in required},
+                'image_available': all((root / name).is_file() for name in required),
+                'pxe_verified': False,
+                'message': 'BIOS/UEFI e DHCP precisam de validação em um cliente real.'}
 
     def login(self, data):
         now = time.time()

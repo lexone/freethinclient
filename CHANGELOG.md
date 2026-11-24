@@ -1,3 +1,13 @@
+## 0.2.0 — piloto Blue Workspace
+
+- Navegação por abas com teclado, histórico e edição preservada.
+- Grupos e perfis desktop, navegador, quiosque, Citrix e RDP.
+- Aprovação de máquinas, credenciais individuais, heartbeat e comandos com confirmação.
+- Recadastro opcional de clientes sem disco pelo MAC em rede de boot confiável.
+- Desktop azul e ícones; receita de ISO Debian 12 e publicação PXE.
+- Atualização local com backup/rollback e testes de isolamento entre agentes.
+- ISO e boot físico ainda precisam ser compilados/homologados no ambiente Linux.
+
 # Histórico
 
 ## 0.1.0

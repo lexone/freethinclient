@@ -37,18 +37,21 @@ def package(root, version, broken=False):
 
 with tempfile.TemporaryDirectory() as temporary:
     root = Path(temporary)
-    manifest, raw = package(root, "0.1.1")
+    major, minor, patch = map(int, updater.current_version().split('.'))
+    good_version = f'{major}.{minor}.{patch + 1}'
+    bad_version = f'{major}.{minor}.{patch + 2}'
+    manifest, raw = package(root, good_version)
     updater.apply_update(manifest, lambda name, limit: raw)
-    assert updater.healthy("0.1.1"), "Valid update failed"
+    assert updater.healthy(good_version), "Valid update failed"
     assert json.loads(updater.STATUS.read_text())["state"] == "updated"
-    manifest, raw = package(root, "0.1.2", broken=True)
+    manifest, raw = package(root, bad_version, broken=True)
     try:
         updater.apply_update(manifest, lambda name, limit: raw)
     except RuntimeError:
         pass
     else:
         raise AssertionError("Broken version should fail its health check")
-    assert updater.healthy("0.1.1"), "Rollback did not restore working service"
+    assert updater.healthy(good_version), "Rollback did not restore working service"
     assert json.loads(updater.STATUS.read_text())["state"] == "rolled_back"
     assert not updater.PENDING.exists()
     result = subprocess.run(["runuser", "-u", "freethinclient", "--", "python3", "-c",

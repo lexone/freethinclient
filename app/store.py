@@ -21,6 +21,7 @@ class Store:
     def connect(self):
         db = sqlite3.connect(self.path, timeout=15)
         try:
+            db.execute("PRAGMA foreign_keys=ON")
             db.execute("PRAGMA journal_mode=WAL")
             with db:
                 yield db
