@@ -7,6 +7,7 @@ const pages = {
   boot: ['O começo de cada workspace.', 'Imagem Linux e arquivos para inicializar seus thin clients.'],
   desktop: ['Um espaço com a sua identidade.', 'Desktop azul, ícones claros e o wallpaper da sua organização.'],
   updates: ['Seu ambiente em dia.', 'Atualizações assinadas com backup e recuperação.'],
+  users: ['Acesso com responsabilidade.', 'Contas individuais e permissões para administrar o ambiente.'],
   audit: ['Tudo o que aconteceu.', 'Acompanhe os registros administrativos do ambiente.']
 };
 const modeNames = {desktop:'Desktop', browser:'Navegador', kiosk:'Quiosque', citrix:'Citrix', rdp:'RDP'};
@@ -56,8 +57,9 @@ function renderDevices(force = false) {
     const controls = node('div','device-controls'), select = node('select',''); select.setAttribute('aria-label','Grupo de ' + device.name);
     const placeholder = node('option','','Selecione um grupo'); placeholder.value=''; select.append(placeholder);
     for (const group of fleetState.groups) {const option=node('option','',group.name);option.value=group.id;select.append(option);} select.value = device.group_id || '';
-    controls.append(select, actionButton(device.approved ? 'Mover / aplicar' : 'Aprovar', async () => {
-      try {await api('/api/devices/assign',{id:device.id,group_id:select.value});await refresh();notify('Perfil liberado. O agente recebe as configurações na próxima comunicação.');}catch(error){notify(error.message,true);}
+    const name = node('input',''); name.value = device.name; name.maxLength = 63; name.setAttribute('aria-label','Nome da máquina');
+    controls.append(name, select, actionButton(device.approved ? 'Mover / aplicar' : 'Aprovar', async () => {
+      try {await api('/api/devices/assign',{id:device.id,group_id:select.value,name:name.value});await refresh();notify('Perfil liberado. O agente recebe as configurações na próxima comunicação.');}catch(error){notify(error.message,true);}
     },false));
     if (device.approved) for (const [action,label] of [['reapply','Reaplicar'],['reboot','Reiniciar'],['poweroff','Desligar']]) {
       controls.append(actionButton(label, async () => {
@@ -70,7 +72,7 @@ function renderDevices(force = false) {
       try{await api('/api/devices/delete',{id:device.id});await refresh();notify('Cadastro removido.');}catch(error){notify(error.message,true);}
     })); row.append(controls); return row;
   });
-  $('device-list').replaceChildren(...(rows.length ? rows : [node('div','empty-state',query ? 'Nenhuma máquina corresponde à busca.' : 'Aguardando o primeiro PC. Inicie a imagem e configure o agente para solicitar o cadastro.')]));
+  $('device-list').replaceChildren(...(rows.length ? rows : [node('div','empty-state',query ? 'Nenhuma máquina corresponde à busca.' : 'Nenhum agente conectado ainda. Conclua o boot PXE para o PC solicitar aprovação.')]));
 }
 function renderFleet(fleet) {
   fleetState = fleet; renderGroups(); renderDevices();
@@ -81,7 +83,7 @@ function renderFleet(fleet) {
 }
 function initializeFleetUI() {
   document.querySelector('[role=tablist]').addEventListener('keydown', event => {
-    const links = [...document.querySelectorAll('[role=tab]')], index = links.indexOf(event.target);
+    const links = [...document.querySelectorAll('[role=tab]')].filter(link=>!link.hidden), index = links.indexOf(event.target);
     if (index < 0 || !['ArrowUp','ArrowDown','ArrowLeft','ArrowRight','Home','End'].includes(event.key)) return;
     event.preventDefault();
     const next = event.key === 'Home' ? 0 : event.key === 'End' ? links.length - 1 : (index + (['ArrowUp','ArrowLeft'].includes(event.key) ? -1 : 1) + links.length) % links.length;
@@ -97,4 +99,32 @@ function initializeFleetUI() {
   });
   addEventListener('beforeunload',event=>{if(groupDirty){event.preventDefault();event.returnValue='';}});
   route();
+}
+
+function resetUser(user = {}) {
+  const form = $('user-form'); form.reset();
+  form.elements.username.value = user.username || ''; form.elements.username.readOnly = !!user.username;
+  form.elements.name.value = user.name || ''; form.elements.role.value = user.role || 'operator';
+  form.elements.enabled.checked = user.enabled === undefined || !!user.enabled;
+  form.elements.password.required = !user.username;
+  $('user-editor-title').textContent = user.username ? 'Editar ' + user.username : 'Novo usuário';
+}
+function renderUsers(users) {
+  if ($('user-list').contains(document.activeElement)) return;
+  $('user-list').replaceChildren(...users.map(user=>{
+    const row=node('article','group-item');
+    row.append(node('h3','',user.name),node('p','muted',user.username + ' · ' + (user.role==='admin'?'Administrador':'Operador') + ' · ' + (user.enabled?'Ativo':'Desativado')),
+      actionButton('Editar',()=>{resetUser(user);$('user-form').elements.name.focus();}));
+    return row;
+  }));
+}
+function initializeUsersUI() {
+$('new-user').addEventListener('click',()=>resetUser());
+$('user-form').addEventListener('submit',async event=>{
+  event.preventDefault();const data=Object.fromEntries(new FormData(event.target));data.enabled=event.target.elements.enabled.checked;
+  try {await api('/api/users/save',data);resetUser();notify('Usuário salvo. As sessões anteriores dessa conta foram encerradas.');await refresh();}
+  catch(error){notify(error.message,true);}
+});
+resetUser();
+
 }

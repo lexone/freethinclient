@@ -1,3 +1,10 @@
+## Próxima revisão do piloto
+
+- Contas individuais no painel: administrador e operador, edição, senha e desativação.
+- Preservação do admin instalado e revogação de sessões ao alterar uma conta.
+- Auditoria com usuário, IP e filtro; proteção do último administrador ativo.
+- Nome da máquina editável junto à aprovação e orientação sobre cadastro após o boot.
+
 ## 0.2.0 — piloto Blue Workspace
 
 - Navegação por abas com teclado, histórico e edição preservada.

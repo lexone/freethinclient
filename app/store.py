@@ -1,4 +1,8 @@
 """SQLite state. Additive schema only; updater snapshots before changes."""
+from contextvars import ContextVar
+
+audit_peer = ContextVar("audit_peer", default="")
+
 import json
 import sqlite3
 import time
@@ -16,6 +20,10 @@ class Store:
                 CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
                 CREATE TABLE IF NOT EXISTS audit (id INTEGER PRIMARY KEY, ts INTEGER, actor TEXT, action TEXT);
             """)
+
+            columns = {row[1] for row in db.execute('PRAGMA table_info(audit)')}
+            if 'ip' not in columns:
+                db.execute("ALTER TABLE audit ADD COLUMN ip TEXT NOT NULL DEFAULT ''")
 
     @contextmanager
     def connect(self):
@@ -40,9 +48,9 @@ class Store:
 
     def audit(self, actor, action):
         with self.connect() as db:
-            db.execute("INSERT INTO audit(ts,actor,action) VALUES (?,?,?)", (int(time.time()), actor, action))
+            db.execute("INSERT INTO audit(ts,actor,action,ip) VALUES (?,?,?,?)", (int(time.time()), actor, action, audit_peer.get()))
 
     def events(self):
         with self.connect() as db:
-            rows = db.execute("SELECT ts,actor,action FROM audit ORDER BY id DESC LIMIT 100").fetchall()
-        return [dict(zip(("ts", "actor", "action"), row)) for row in rows]
+            rows = db.execute("SELECT ts,actor,action,ip FROM audit ORDER BY id DESC LIMIT 100").fetchall()
+        return [dict(zip(("ts", "actor", "action", "ip"), row)) for row in rows]

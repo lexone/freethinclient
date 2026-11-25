@@ -14,8 +14,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 
 from app.security import password_ok, version_tuple
-from app.store import Store
-from app import fleet
+from app.store import Store, audit_peer
+from app import fleet, users
 
 BASE = Path(__file__).resolve().parents[1]
 VERSION = (BASE / "VERSION").read_text().strip()
@@ -51,6 +51,7 @@ class ControlServer(ThreadingHTTPServer):
         super().__init__(address, Handler)
         self.store = Store(root)
         fleet.initialize(self.store)
+        users.initialize(self.store, configuration["admin_hash"])
         self.configuration = configuration
         self.sessions = {}
         self.attempts = {}
@@ -90,6 +91,11 @@ class Handler(BaseHTTPRequestHandler):
             if not session or session["expires"] < time.time():
                 self.server.sessions.pop(token, None)
                 return None
+        account = users.account(self.server.store, session['username'])
+        if not account or not account['enabled'] or account['revision'] != session['revision']:
+            with self.server.lock:
+                self.server.sessions.pop(token, None)
+            return None
         if mutate and not secrets.compare_digest(self.headers.get("X-CSRF-Token", ""), session["csrf"]):
             return None
         return session
@@ -121,11 +127,16 @@ class Handler(BaseHTTPRequestHandler):
         session = self.session()
         if not session:
             return self.reply(401, {"error": "Entre no painel."})
+        if path == '/api/users':
+            if session['role'] != 'admin':
+                return self.reply(403, {'error': 'Somente administradores gerenciam usuários'})
+            return self.reply(200, {'users': users.listing(self.server.store)})
         if path == "/api/state":
             state = self.server.store
             status_path = Path(self.server.configuration["update_status"])
             update = json.loads(status_path.read_text()) if status_path.exists() else {"state": "idle"}
             return self.reply(200, {"version": VERSION, "csrf": session["csrf"],
+                                   "user": {"username": session["username"], "role": session["role"]},
                                    "repository": self.server.configuration["repository"],
                                    "profile": state.get("profile", validate_profile({})),
                                    "wallpaper": state.get("wallpaper"), "update": update,
@@ -141,6 +152,7 @@ class Handler(BaseHTTPRequestHandler):
         return self.reply(404, {"error": "Não encontrado"})
 
     def do_POST(self):
+        peer_token = audit_peer.set(self.headers.get('X-Real-IP', self.client_address[0])[:64])
         try:
             length = int(self.headers.get("Content-Length", "0"))
             if not 0 < length <= MAX_BODY:
@@ -156,6 +168,9 @@ class Handler(BaseHTTPRequestHandler):
             self.reply(400, {"error": str(exc)[:200]})
         except OSError:
             self.reply(500, {"error": "Falha ao gravar. Consulte o journal do serviço."})
+
+        finally:
+            audit_peer.reset(peer_token)
 
     def post(self, path, data):
         if path == "/api/login":
@@ -195,24 +210,32 @@ class Handler(BaseHTTPRequestHandler):
         if not session:
             return self.reply(403, {"error": "Sessão ou proteção CSRF inválida"})
         state = self.server.store
+        actor = session['username']
+        if (path.startswith('/api/users/') or path.startswith('/api/update/')) and session['role'] != 'admin':
+            state.audit(actor, 'Acesso negado: ' + path)
+            return self.reply(403, {'error': 'Esta ação exige um administrador'})
+        if path == '/api/users/save':
+            username = users.save(state, data, actor)
+            return self.reply(200, {'ok': True, 'username': username})
         if path == '/api/groups/save':
-            return self.reply(200, {'ok': True, 'id': fleet.save_group(state, data)})
+            return self.reply(200, {'ok': True, 'id': fleet.save_group(state, data, actor)})
         if path == '/api/groups/delete':
-            fleet.delete_group(state, fleet.text(data.get('id', ''), 40))
+            fleet.delete_group(state, fleet.text(data.get('id', ''), 40), actor)
             return self.reply(200, {'ok': True})
         if path == '/api/devices/assign':
-            fleet.assign(state, data)
+            fleet.assign(state, data, actor)
             return self.reply(200, {'ok': True})
         if path == '/api/devices/command':
-            fleet.command(state, data)
+            fleet.command(state, data, actor)
             return self.reply(202, {'ok': True})
         if path == '/api/devices/delete':
             identity = fleet.text(data.get('id', ''), 40)
             with state.connect() as db:
                 db.execute('DELETE FROM fleet_devices WHERE id=?', (identity,))
-            state.audit('admin', 'Cadastro e credencial removidos: ' + identity)
+            state.audit(actor, 'Cadastro e credencial removidos: ' + identity)
             return self.reply(200, {'ok': True})
         if path == "/api/logout":
+            state.audit(actor, "Logout do painel")
             with self.server.lock:
                 token = http.cookies.SimpleCookie(self.headers.get("Cookie", ""))["session"].value
                 self.server.sessions.pop(token, None)
@@ -220,7 +243,7 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/profile":
             profile = validate_profile({**state.get('profile', {}), **data})
             state.set("profile", profile)
-            state.audit("admin", "Perfil salvo: " + profile["group"])
+            state.audit(actor, "Perfil salvo: " + profile["group"])
             return self.reply(200, {"ok": True})
         if path == "/api/wallpaper":
             raw = base64.b64decode(data.get("data", ""), validate=True)
@@ -232,11 +255,11 @@ class Handler(BaseHTTPRequestHandler):
             temp.write_bytes(raw)
             os.replace(temp, target)
             state.set("wallpaper", {"mime": mime, "sha256": hashlib.sha256(raw).hexdigest()})
-            state.audit("admin", "Wallpaper atualizado")
+            state.audit(actor, "Wallpaper atualizado")
             return self.reply(200, {"ok": True})
         if path in ("/api/update/check", "/api/update/apply"):
             action = path.rsplit("/", 1)[1]
-            job = {"action": action, "requested_at": int(time.time()), "actor": "admin"}
+            job = {"action": action, "requested_at": int(time.time()), "actor": actor}
             if action == "apply":
                 version_tuple(data.get("version"))
                 job["version"] = data["version"]
@@ -250,7 +273,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.reply(409, {"error": "Já existe uma solicitação em andamento"})
             finally:
                 temporary.unlink(missing_ok=True)
-            state.audit("admin", "Atualização solicitada: " + action)
+            state.audit(actor, "Atualização solicitada: " + action)
             return self.reply(202, {"ok": True, "message": "Solicitação enviada ao serviço de atualização"})
         return self.reply(404, {"error": "Não encontrado"})
 
@@ -275,7 +298,11 @@ class Handler(BaseHTTPRequestHandler):
         password = data.get("password", "")
         if not isinstance(password, str) or len(password) > 1024:
             raise ValueError("Senha inválida")
-        if data.get("username") != "admin" or not password_ok(password, self.server.configuration["admin_hash"]):
+        account = users.account(self.server.store, data.get('username'))
+        stored = account['password_hash'] if account else self.server.configuration['admin_hash']
+        valid = password_ok(password, stored)
+        if not account or not account['enabled'] or not valid:
+            self.server.store.audit('anonymous', 'Tentativa de login recusada')
             return self.reply(401, {"error": "Usuário ou senha inválidos"})
         token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         with self.server.lock:
@@ -283,9 +310,10 @@ class Handler(BaseHTTPRequestHandler):
             self.server.sessions = {k: v for k, v in self.server.sessions.items() if v["expires"] > now}
             if len(self.server.sessions) >= 100:
                 self.server.sessions.clear()
-            self.server.sessions[token] = {"csrf": csrf, "expires": now + 3600}
+            self.server.sessions[token] = {"csrf": csrf, "expires": now + 3600, "username": account["username"],
+                                           "role": account["role"], "revision": account["revision"]}
         secure = "; Secure" if self.server.configuration.get("secure_cookie", True) else ""
-        self.server.store.audit("admin", "Login no painel")
+        self.server.store.audit(account["username"], "Login no painel")
         return self.reply(200, {"ok": True, "csrf": csrf}, cookie=f"session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=3600{secure}")
 
 

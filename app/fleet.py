@@ -77,7 +77,7 @@ def groups(store):
     return [dict(json.loads(profile), id=identity, revision=revision) for identity, profile, revision in rows]
 
 
-def save_group(store, data):
+def save_group(store, data, actor='admin'):
     import sqlite3
     profile = validate_group(data)
     identity = text(data.get('id', ''), 40) or secrets.token_hex(12)
@@ -90,16 +90,16 @@ def save_group(store, data):
                        (identity, profile['name'], json.dumps(profile)))
     except sqlite3.IntegrityError:
         raise ValueError('Já existe um grupo com esse nome') from None
-    store.audit('admin', 'Grupo salvo: ' + profile['name'])
+    store.audit(actor, 'Grupo salvo: ' + profile['name'])
     return identity
 
 
-def delete_group(store, identity):
+def delete_group(store, identity, actor='admin'):
     with store.connect() as db:
         if db.execute('SELECT 1 FROM fleet_devices WHERE group_id=?', (identity,)).fetchone():
             raise ValueError('Mova as máquinas para outro grupo antes de excluir')
         db.execute('DELETE FROM fleet_groups WHERE id=?', (identity,))
-    store.audit('admin', 'Grupo excluído: ' + identity)
+    store.audit(actor, 'Grupo excluído: ' + identity)
 
 
 def devices(store):
@@ -151,7 +151,7 @@ def authenticate(store, token):
     return row[0] if row else None
 
 
-def assign(store, data):
+def assign(store, data, actor='admin'):
     identity, group_id = text(data.get('id', ''), 40), text(data.get('group_id', ''), 40)
     name = text(data.get('name', ''), 63)
     if name and not re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9-]{0,62}', name):
@@ -163,10 +163,10 @@ def assign(store, data):
                             (group_id, name, name, identity))
         if not cursor.rowcount:
             raise ValueError('Máquina não encontrada')
-    store.audit('admin', 'Máquina aprovada/vinculada: ' + identity)
+    store.audit(actor, 'Máquina aprovada/vinculada: ' + identity + ' / grupo: ' + group_id + (' / nome: ' + name if name else ''))
 
 
-def command(store, data):
+def command(store, data, actor='admin'):
     action = data.get('action')
     if action not in ('reapply', 'reboot', 'poweroff'):
         raise ValueError('Comando inválido')
@@ -178,7 +178,7 @@ def command(store, data):
         if row[1]:
             raise ValueError('Aguarde o comando anterior ser confirmado pelo agente')
         db.execute('UPDATE fleet_devices SET command=?,command_id=? WHERE id=?', (action, secrets.token_hex(12), identity))
-    store.audit('admin', 'Comando solicitado: ' + action + ' / ' + identity)
+    store.audit(actor, 'Comando solicitado: ' + action + ' / ' + identity)
 
 
 def heartbeat(store, identity, data):

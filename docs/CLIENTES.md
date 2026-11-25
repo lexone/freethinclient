@@ -154,3 +154,26 @@ Referências oficiais:
 - https://manpages.debian.org/bookworm/live-boot-doc/live-boot.7.en.html
 - https://manpages.debian.org/bookworm/freerdp2-x11/xfreerdp.1.en.html
 - iPXE: https://ipxe.org/howto/chainloading
+
+
+## Contas do painel e atividade
+
+A aba Usuários permite criar contas de administrador e operador, editar nome,
+redefinir senha e desativar o acesso. O login é único e não pode ser renomeado.
+Administradores gerenciam usuários e atualizações; operadores gerenciam máquinas,
+grupos e aparência. O sistema impede desativar/rebaixar o último administrador ativo.
+A senha admin existente é preservada na migração. Alterar uma conta invalida suas sessões.
+
+Atividade exibe os últimos 100 eventos com usuário, horário, ação e IP, com filtro.
+O IP vem do nginx, que sobrescreve X-Real-IP; mantenha o backend em loopback.
+Eventos anteriores mantêm seus autores originais e não recebem atribuição retroativa.
+Senhas e tokens não são gravados nos eventos. A auditoria cobre as ações do painel,
+não os aplicativos ou sites usados dentro da sessão do thin client.
+
+A máquina aparece pendente depois que o Linux carrega e o agente solicita cadastro.
+O servidor TFTP estático não comunica os pedidos de boot ao painel. Um loop baixando
+ipxe.efi significa que o DHCP continua entregando o primeiro estágio. Na reserva
+Windows, preserve 067 padrão como freethinclient/ipxe.efi e use a classe de usuário
+iPXE (ID ASCII iPXE) para entregar 067 http://IP_DO_SERVIDOR:8081/boot.ipxe.
+Na lista de máquinas, ajuste o nome e escolha um grupo antes de Aprovar; as
+configurações de sessão são definidas em Grupos e perfis.

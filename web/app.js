@@ -1,10 +1,12 @@
 'use strict';
+let auditEvents = [];
 let csrf = '', availableVersion = '', authenticated = false, lastUpdate = '';
 const $ = id => document.getElementById(id);
 function notify(message, error = false) { $('notice').textContent = message; $('notice').className = error ? 'error' : ''; }
 async function api(path, data) {
   const response = await fetch(path, {method: data ? 'POST' : 'GET', headers: data ? {'Content-Type': 'application/json', 'X-CSRF-Token': csrf} : {}, body: data ? JSON.stringify(data) : undefined});
   const result = await response.json();
+  if (response.status === 401) showLogin();
   if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
   return result;
 }
@@ -25,9 +27,15 @@ async function refresh(initial = false) {
       for (const [key, value] of Object.entries(state.profile)) {const input = $('profile-form').elements.namedItem(key); if (input) input.type === 'checkbox' ? input.checked = value : input.value = value;}
       if (state.wallpaper) { $('wallpaper-preview').src = '/api/wallpaper'; $('wallpaper-preview').hidden = false; $('wallpaper-empty').hidden = true; }
     }
+    $('logout').textContent = 'Sair (' + state.user.username + ')';
+    const admin = state.user.role === 'admin';
+    $('tab-users').hidden = !admin; $('user-form').hidden = !admin;
+    $('check-update').hidden = !admin; $('apply-update').hidden = !admin;
+    if (!admin && location.hash === '#users') location.hash = '#machines';
+    if (admin) renderUsers((await api('/api/users')).users);
     renderUpdate(state.update);
     renderFleet(fleet); route();
-    $('events').replaceChildren(...state.events.map(event => {const li = document.createElement('li'); const time = document.createElement('time');time.textContent = new Date(event.ts * 1000).toLocaleString('pt-BR');li.append(time, document.createTextNode(event.action));return li;}));
+    auditEvents = state.events; renderAudit();
     if (lastUpdate === 'applying' && state.update.state === 'updated') notify('Atualização concluída. Recarregue a página para carregar a nova interface.');
     lastUpdate = state.update.state;
   } catch (error) { if (initial) showLogin(); else notify('Reconectando ao painel… Se a sessão expirou, entre novamente.'); }
@@ -39,5 +47,16 @@ $('wallpaper-file').addEventListener('change', async event => {const file = even
 $('check-update').addEventListener('click', async () => {try {await api('/api/update/check', {});$('check-update').disabled = true;notify('Consulta agendada. O serviço responde em até 15 segundos.');}catch(error){notify(error.message,true);} });
 $('apply-update').addEventListener('click', async () => {if (!availableVersion || !window.confirm(`Instalar a versão ${availableVersion}? Será feito backup e haverá uma breve interrupção do painel.`)) return;try {await api('/api/update/apply', {version:availableVersion});$('apply-update').disabled = true;notify('Atualização solicitada. Aguarde o resultado.');}catch(error){notify(error.message,true);} });
 initializeFleetUI();
+initializeUsersUI();
 refresh(true);
 setInterval(() => {if (authenticated) refresh();}, 5000);
+
+function renderAudit() {
+  const query = $('audit-search').value.trim().toLowerCase();
+  $('events').replaceChildren(...auditEvents.filter(event=>[event.actor,event.action,event.ip].join(' ').toLowerCase().includes(query)).map(event=>{
+    const li=document.createElement('li'), time=document.createElement('time');
+    time.textContent=new Date(event.ts*1000).toLocaleString('pt-BR');
+    li.append(time,document.createTextNode('[' + event.actor + (event.ip?' · '+event.ip:'') + '] ' + event.action));return li;
+  }));
+}
+$('audit-search').addEventListener('input',renderAudit);
