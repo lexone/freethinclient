@@ -66,6 +66,7 @@ for i in range(20):
     time.sleep(1)
 else: raise SystemExit('Serviço não passou no teste de saúde')
 PY
+bash "$SOURCE/scripts/install-image-worker.sh"
 trap - ERR
 echo "Versão $VERSION aplicada. Backup: $BACKUP"
 echo 'Recarregue o painel com Ctrl+F5. A senha administrativa foi preservada.'

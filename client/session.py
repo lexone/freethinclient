@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Unprivileged desktop/session supervisor for Blue Workspace."""
 import json
+import hashlib
 import logging
 import os
 import shutil
@@ -32,7 +33,9 @@ def desktop_file(name, title, icon, action):
     path.write_text('[Desktop Entry]\nType=Application\nName=' + title + '\nIcon=' + str(ASSETS / Path(icon).with_suffix('.png')) +
                     '\nExec=/usr/bin/python3 /usr/local/lib/freethinclient/session.py --launch ' + action + '\nTerminal=false\n')
     path.chmod(0o700)
-    call(['gio', 'set', str(path), 'metadata::trusted', 'true'])
+    # XFCE uses a checksum of the exact launcher bytes, not GNOME metadata::trusted.
+    digest = hashlib.sha256(path.read_bytes()).hexdigest()
+    call(['gio', 'set', '-t', 'string', str(path), 'metadata::xfce-exe-checksum', digest])
 
 
 def application(profile, mode):

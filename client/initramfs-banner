@@ -1,0 +1,6 @@
+#!/bin/sh
+PREREQ=""
+case "${1:-}" in prereqs) echo "$PREREQ"; exit 0 ;; esac
+if [ -r /etc/freethinclient-banner ]; then
+    { printf '\033[1;36m'; cat /etc/freethinclient-banner; printf '\033[0m'; } > /dev/console
+fi

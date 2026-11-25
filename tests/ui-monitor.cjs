@@ -7,6 +7,7 @@ const root = path.resolve(__dirname, '..');
 const elements = new Map();
 const element = id => {
   if (!elements.has(id)) elements.set(id, {textContent:'', dataset:{}, hidden:false,
+    replaceChildren(...children){this.children=children;},
     setAttribute(key,value){this[key]=value;}, elements:{namedItem(){return null;}}});
   return elements.get(id);
 };
@@ -14,10 +15,13 @@ let network, calls=0;
 const context = vm.createContext({
   console, setTimeout, clearTimeout, AbortController, Date,
   addEventListener(){}, location:{hash:"#machines"},
-  document:{getElementById:element},
+  document:{getElementById:element,
+    createElement:tag=>({tag,append(...children){this.children=children;}}),
+    querySelectorAll:()=>['image-inspect','image-citrix','image-linux'].map(element)},
   fetch:(...args)=>{calls++;return network(...args);}
 });
 vm.runInContext(fs.readFileSync(path.join(root,'web/fleet.js'),'utf8'),context);
+vm.runInContext(fs.readFileSync(path.join(root,'web/images.js'),'utf8'),context);
 const app = fs.readFileSync(path.join(root,'web/app.js'),'utf8');
 vm.runInContext(app.slice(0,app.indexOf("$('login-form').addEventListener")),context);
 vm.runInContext(`renderFleet=f=>{fleetState=f;}; renderUsers=()=>{};
@@ -52,6 +56,15 @@ async function main(){
   await run('refresh()');
   assert.equal(element('fleet-monitor').dataset.state,'ready');
   assert.match(element('fleet-monitor-counts').textContent,/1 cadastradas · 1 online · 1 pendentes/);
+  run("renderImages({state:'updating',queued:true,worker_ready:true,step:2,versions:{chromium:'123'},log:'<literal>'})");
+  assert.equal(element('image-inspect').disabled,true);
+  assert.equal(element('image-job-progress').value,2);
+  assert.equal(element('image-job-log').textContent,'<literal>');
+  run("renderImages({state:'done',queued:false,worker_ready:true,step:5,versions:{chromium:'124'},rollback_available:true})");
+  assert.equal(element('image-inspect').disabled,false);
+  assert.equal(element('image-rollback').disabled,false);
+  run("renderImages({state:'idle',worker_ready:false})");
+  assert.equal(element('image-inspect').disabled,true);
   // Force the real API timeout handler without waiting fifteen seconds.
   let timeout;
   context.setTimeout=callback=>{timeout=callback;return 1;};context.clearTimeout=()=>{};
@@ -60,6 +73,6 @@ async function main(){
   });
   const timed=run("api('/timeout')");timeout();
   await assert.rejects(timed,/15 segundos/);
-  console.log('UI monitor: concurrent refresh, loading, failure, recovery and timeout passed');
+  console.log('UI monitor: concurrent refresh, loading, failure, recovery, timeout and image-job controls passed');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

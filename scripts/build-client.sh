@@ -32,7 +32,7 @@ lb config --mode debian --distribution bookworm --architecture amd64 \
   --binary-image iso-hybrid --bootloaders 'syslinux grub-efi' \
   --archive-areas 'main contrib non-free non-free-firmware' \
   --debian-installer none --apt-recommends false --uefi-secure-boot disable \
-  --bootappend-live 'boot=live components username=thinclient hostname=freethinclient locales=pt_BR.UTF-8 keyboard-layouts=br timezone=America/Sao_Paulo nopersistence'
+  --bootappend-live 'boot=live quiet loglevel=3 components username=thinclient hostname=freethinclient locales=pt_BR.UTF-8 keyboard-layouts=br timezone=America/Sao_Paulo nopersistence'
 mkdir -p config/package-lists config/hooks/live
 cat > config/package-lists/freethinclient.list.chroot <<'EOF'
 linux-image-amd64
@@ -78,6 +78,10 @@ install -m 0644 "$SOURCE/web/assets/"*.svg "$ROOT/usr/share/freethinclient/"
 for name in blue-workspace browser remote citrix; do
   rsvg-convert -o "$ROOT/usr/share/freethinclient/$name.png" "$SOURCE/web/assets/$name.svg"
 done
+install -d "$ROOT/etc/initramfs-tools/hooks" "$ROOT/etc/initramfs-tools/scripts/init-premount"
+install -m 0644 "$SOURCE/client/boot-banner.txt" "$ROOT/usr/share/freethinclient/"
+install -m 0755 "$SOURCE/client/initramfs-banner-hook" "$ROOT/etc/initramfs-tools/hooks/freethinclient-banner"
+install -m 0755 "$SOURCE/client/initramfs-banner" "$ROOT/etc/initramfs-tools/scripts/init-premount/freethinclient-banner"
 install -m 0644 "$SOURCE/client/kiosk.xml" "$ROOT/usr/share/freethinclient/"
 install -m 0644 "$SOURCE/client/freethinclient.desktop" "$ROOT/etc/xdg/autostart/"
 install -m 0644 "$SOURCE/client/freethinclient-client.service" "$ROOT/etc/systemd/system/"
@@ -109,6 +113,7 @@ passwd -l thinclient
 gpasswd -d thinclient sudo 2>/dev/null || true
 rm -f /etc/sudoers.d/live
 systemctl enable lightdm NetworkManager freethinclient-client
+update-initramfs -u -k all
 EOF
 chmod 0755 config/hooks/live/0900-freethinclient.hook.chroot
 if [[ ${FTC_BUILD_CONFIG_ONLY:-0} == 1 ]]; then

@@ -54,7 +54,7 @@ VERSION=$(tr -d '\r\n' < "$SOURCE/VERSION")
 DEST="/opt/freethinclient/releases/$VERSION-initial"
 [[ ! -e "$DEST" ]] || { echo 'Release inicial já existe. Confira instalação parcial antes de repetir.' >&2; exit 1; }
 install -d -m 0755 "$DEST"
-cp -R "$SOURCE/app" "$SOURCE/web" "$DEST/"
+cp -R "$SOURCE/app" "$SOURCE/web" "$SOURCE/client" "$SOURCE/scripts" "$SOURCE/deploy" "$SOURCE/docs" "$DEST/"
 install -m 0644 "$SOURCE/VERSION" "$DEST/VERSION"
 find "$DEST" -type d -name __pycache__ -prune -exec rm -rf -- {} +
 chown -R root:root "$DEST"
@@ -101,6 +101,7 @@ install -m 0644 "$SOURCE/deploy/nginx.conf" /etc/nginx/conf.d/freethinclient.con
 nginx -t
 systemctl daemon-reload
 systemctl enable --now freethinclient.service freethinclient-update.timer
+bash "$SOURCE/scripts/install-image-worker.sh"
 systemctl enable nginx
 systemctl reload-or-restart nginx
 sleep 2

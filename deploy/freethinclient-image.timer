@@ -1,0 +1,11 @@
+[Unit]
+Description=Check FreeThinClient image maintenance requests
+
+[Timer]
+OnBootSec=25s
+OnUnitInactiveSec=15s
+AccuracySec=1s
+Unit=freethinclient-image.service
+
+[Install]
+WantedBy=timers.target

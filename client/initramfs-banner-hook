@@ -1,0 +1,6 @@
+#!/bin/sh
+set -eu
+PREREQ=""
+case "${1:-}" in prereqs) echo "$PREREQ"; exit 0 ;; esac
+mkdir -p "$DESTDIR/etc"
+cp /usr/share/freethinclient/boot-banner.txt "$DESTDIR/etc/freethinclient-banner"

@@ -1,4 +1,5 @@
 import importlib.util
+import os
 import json
 from pathlib import Path
 import tempfile
@@ -114,3 +115,14 @@ class ClientTests(unittest.TestCase):
     def test_desktop_helper_timeout_does_not_abort_session(self):
         with patch.object(session.subprocess,'run',side_effect=session.subprocess.TimeoutExpired('gio',10)):
             self.assertEqual(session.call(['gio','set']).returncode,1)
+
+    def test_managed_launcher_has_xfce_checksum_for_exact_file_bytes(self):
+        import hashlib
+        with tempfile.TemporaryDirectory() as directory:
+            with patch.object(session,'desktop_directory',return_value=Path(directory)), patch.object(session,'call') as command:
+                session.desktop_file('browser','Navegador','browser.png','browser')
+                file=Path(directory)/'browser.desktop'
+                digest=hashlib.sha256(file.read_bytes()).hexdigest()
+                command.assert_called_once_with(['gio','set','-t','string',str(file),'metadata::xfce-exe-checksum',digest])
+                if os.name == "posix":
+                    self.assertTrue(file.stat().st_mode & 0o100)

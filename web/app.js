@@ -42,6 +42,8 @@ async function loadDashboard(initial) {
     }
     $('logout').textContent = 'Sair (' + state.user.username + ')';
     const admin = state.user.role === 'admin';
+    $('image-manager').hidden = !admin;
+    if(admin) renderImages(await api('/api/images'));
     $('tab-users').hidden = !admin; $('user-form').hidden = !admin;
     $('check-update').hidden = !admin; $('apply-update').hidden = !admin;
     if (!admin && location.hash === '#users') location.hash = '#machines';
@@ -62,6 +64,7 @@ $('check-update').addEventListener('click', async () => {try {await api('/api/up
 $('apply-update').addEventListener('click', async () => {if (!availableVersion || !window.confirm(`Instalar a versão ${availableVersion}? Será feito backup e haverá uma breve interrupção do painel.`)) return;try {await api('/api/update/apply', {version:availableVersion});$('apply-update').disabled = true;notify('Atualização solicitada. Aguarde o resultado.');}catch(error){notify(error.message,true);} });
 initializeFleetUI();
 initializeUsersUI();
+initializeImagesUI();
 refresh(true);
 $('refresh-devices').addEventListener('click',()=>refresh());
 setInterval(()=>{

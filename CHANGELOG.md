@@ -1,5 +1,10 @@
 ## Próxima revisão do piloto
 
+- Manutenção de imagem no portal: versões, Linux, Chromium/Chrome, Citrix Workspace e rollback.
+- Serviço root separado com ações fixas, staging, publicação versionada e auditoria.
+- Atalhos gerenciados recebem o checksum de confiança específico do XFCE.
+- Banner de boot FREETHINCLIENT e Copyright © 2026 Everton S Oliveira no initrd.
+
 - Desktop com atalhos selecionáveis, ícones do sistema e barra configuráveis por grupo.
 - Quiosque com navegador, portal Citrix ou RDP e opção de tela cheia no navegador.
 - Wallpaper e ícones em PNG; fallback de propriedades XFCE e diretório XDG localizado.

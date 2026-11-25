@@ -237,3 +237,52 @@ o wallpaper mesmo quando as propriedades ainda não existem no xfconf, respeita
 o diretório Desktop localizado do XDG e substitui os painéis padrão por uma barra
 inferior. A compilação completa também inclui o suporte SVG e os mesmos PNGs.
 A aparência e a troca de modos precisam ser conferidas no hardware do piloto.
+
+
+## Manutenção da imagem pelo portal
+
+Administradores usam Imagens e boot → Linux e aplicativos da imagem PXE:
+
+- Consultar versões lê o banco dpkg da imagem publicada.
+- Atualizar componentes do cliente aplica o agente, a sessão, os PNGs e o banner
+  da versão instalada no servidor. Essa opção também corrige a confiança dos atalhos
+  XFCE com metadata::xfce-exe-checksum, calculado dos bytes do arquivo gerado;
+  a proteção para arquivos externos continua ativa.
+- Atualizar Linux instala as atualizações e o kernel do Debian 12; não faz mudança
+  de versão principal da distribuição e não atualiza o Ubuntu do servidor.
+- Chromium vem do repositório Debian. Google Chrome usa o .deb estável oficial,
+  com HTTPS e validação de nome/arquitetura do pacote. Quando instalado, Chrome
+  é preferido pelo supervisor de sessão.
+- Citrix Workspace exige o link HTTPS direto do .deb amd64 nos hosts oficiais
+  e seu SHA-256. O pacote deve ser icaclient; dependências incompatíveis causam
+  erro antes da publicação. O portal no navegador continua uma opção distinta do
+  cliente ICA instalado. A obtenção de um novo link Citrix é feita no site oficial.
+
+O serviço root separado freethinclient-image.timer verifica pedidos a cada 15s.
+A API aceita apenas ações fixas e exige administrador e CSRF. A fila, as etapas,
+o log recente e o autor ficam visíveis; a auditoria registra pedido e resultado.
+O painel não executa comandos ou escolhe caminhos do host.
+
+As alterações são feitas em cópia extraída sob /var/lib/freethinclient-image,
+com montagem privada e serviços do chroot bloqueados. Pacotes apt usam verificação
+normal do repositório; não se usam opções para desabilitar assinaturas. Downloads
+Google/Citrix não podem redirecionar para hosts externos à lista do fornecedor.
+A publicação cria /srv/freethinclient/boot/releases/ID com kernel, initrd e SquashFS
+compatíveis e checksums. Somente após todas as etapas troca atomicamente boot.ipxe.
+A imagem anterior permanece disponível e Voltar à imagem anterior troca o próximo
+boot para ela. Não apague releases enquanto existirem clientes iniciando por elas.
+Os clientes já ligados não são reiniciados e precisam de novo boot para atualizar.
+A ISO original não é regenerada por essa manutenção.
+
+Instalações novas e upgrade-local.sh instalam o serviço e seus pré-requisitos.
+É necessário atualizar uma instalação anterior uma vez para disponibilizar essa
+área. As tarefas seguintes são solicitadas no portal. Antes da primeira manutenção,
+conclua a publicação inicial da imagem e mantenha espaço para descompactação,
+nova compactação e versões anteriores. Falhas de pacote não devem trocar o script
+ativo; a validação de boot físico continua sendo parte do piloto.
+
+O initrd do cliente mostra o banner FREETHINCLIENT fornecido para o projeto,
+com Copyright © 2026 Everton S Oliveira, no início do Linux. A atualização de
+componentes regenera o initrd para incluir esse banner. Boot normal usa quiet e
+loglevel=3, preservando mensagens de erro. O banner usa os glifos Unicode fornecidos;
+a fonte e a largura do console determinam a apresentação no hardware.

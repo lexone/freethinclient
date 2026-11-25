@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 
 from app.security import password_ok, version_tuple
 from app.store import Store, audit_peer
-from app import fleet, users
+from app import fleet, users, images
 
 BASE = Path(__file__).resolve().parents[1]
 VERSION = (BASE / "VERSION").read_text().strip()
@@ -120,13 +120,17 @@ class Handler(BaseHTTPRequestHandler):
             if not file.is_file():
                 return self.reply(404, {'error': 'Não encontrado'})
             return self.reply(200, file.read_bytes(), mime='image/svg+xml')
-        if path in ("/", "/index.html", "/app.js", "/fleet.js", "/style.css", "/blue.css"):
+        if path in ("/", "/index.html", "/app.js", "/fleet.js", "/images.js", "/style.css", "/blue.css"):
             file = BASE / "web" / ("index.html" if path == "/" else path[1:])
             mime = "text/html; charset=utf-8" if file.suffix == ".html" else "text/javascript" if file.suffix == ".js" else "text/css"
             return self.reply(200, file.read_bytes(), mime=mime)
         session = self.session()
         if not session:
             return self.reply(401, {"error": "Entre no painel."})
+        if path == '/api/images':
+            if session['role'] != 'admin':
+                return self.reply(403, {'error': 'Somente administradores gerenciam imagens'})
+            return self.reply(200, images.snapshot(self.server.store, self.server.configuration))
         if path == '/api/users':
             if session['role'] != 'admin':
                 return self.reply(403, {'error': 'Somente administradores gerenciam usuários'})
@@ -211,9 +215,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Sessão ou proteção CSRF inválida"})
         state = self.server.store
         actor = session['username']
-        if (path.startswith('/api/users/') or path.startswith('/api/update/')) and session['role'] != 'admin':
+        if (path.startswith('/api/users/') or path.startswith('/api/update/') or path.startswith('/api/images/')) and session['role'] != 'admin':
             state.audit(actor, 'Acesso negado: ' + path)
             return self.reply(403, {'error': 'Esta ação exige um administrador'})
+        if path == '/api/images/jobs':
+            try:
+                identity = images.enqueue(state, self.server.configuration, data, actor)
+            except FileExistsError:
+                return self.reply(409, {'error': 'Já existe uma tarefa de imagem em andamento'})
+            return self.reply(202, {'ok': True, 'id': identity})
         if path == '/api/users/save':
             username = users.save(state, data, actor)
             return self.reply(200, {'ok': True, 'username': username})
