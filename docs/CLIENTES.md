@@ -177,3 +177,14 @@ Windows, preserve 067 padrão como freethinclient/ipxe.efi e use a classe de usu
 iPXE (ID ASCII iPXE) para entregar 067 http://IP_DO_SERVIDOR:8081/boot.ipxe.
 Na lista de máquinas, ajuste o nome e escolha um grupo antes de Aprovar; as
 configurações de sessão são definidas em Grupos e perfis.
+
+
+### Kernel panic antes do live-boot em UEFI
+
+Se kernel e initrd baixam com OK, mas o Linux para imediatamente com
+`VFS: Unable to mount root fs on unknown-block(0,0)`, verifique a entrega do initrd
+pelo carregador. O script publicado passa explicitamente `initrd=initrd.magic`
+para compatibilidade com versões antigas de iPXE/EFI. O arquivo HTTP continua
+se chamando initrd.img; initrd.magic é o arquivo virtual criado pelo iPXE.
+Não é preciso reconstruir a imagem para alterar essa linha em boot.ipxe.
+Essa é uma hipótese de correção para o piloto; confirme reiniciando o cliente.
