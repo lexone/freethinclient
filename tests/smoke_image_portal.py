@@ -80,6 +80,8 @@ def main():
             assert 'Everton S Oliveira' in content and 'FREETHINCLIENT' in content
             script=subprocess.check_output(['unsquashfs','-cat',str(current/'filesystem.squashfs'),'usr/local/lib/freethinclient/session.py']).decode()
             assert 'metadata::xfce-exe-checksum' in script
+            info=subprocess.check_output(['unsquashfs','-cat',str(current/'filesystem.squashfs'),'etc/xdg/autostart/freethinclient-info.desktop']).decode()
+            assert 'device_info.py' in info
             result=worker.perform({'action':'rollback','id':'b'*24},lambda *a,**k:None,work/'job.log')
             assert worker.source_image()[0].name==previous
             assert result['versions']['chromium']=='fixture-1'

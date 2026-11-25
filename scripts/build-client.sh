@@ -74,7 +74,7 @@ install -d "$ROOT/usr/local/lib/freethinclient" "$ROOT/usr/share/freethinclient"
   "$ROOT/etc/freethinclient-client" "$ROOT/etc/xdg/autostart" "$ROOT/etc/lightdm/lightdm.conf.d" \
   "$ROOT/etc/systemd/system/multi-user.target.wants" "$ROOT/var/lib/freethinclient-client" \
   "$ROOT/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml"
-install -m 0644 "$SOURCE/client/agent.py" "$SOURCE/client/session.py" "$ROOT/usr/local/lib/freethinclient/"
+install -m 0644 "$SOURCE/client/agent.py" "$SOURCE/client/session.py" "$SOURCE/client/device_info.py" "$ROOT/usr/local/lib/freethinclient/"
 install -m 0644 "$SOURCE/web/assets/"*.svg "$ROOT/usr/share/freethinclient/"
 for name in blue-workspace browser remote citrix shutdown restart; do
   rsvg-convert -o "$ROOT/usr/share/freethinclient/$name.png" "$SOURCE/web/assets/$name.svg"
@@ -86,6 +86,7 @@ install -m 0755 "$SOURCE/client/initramfs-banner" "$ROOT/etc/initramfs-tools/scr
 install -d "$ROOT/etc/polkit-1/rules.d"
 install -m 0644 "$SOURCE/client/power.rules" "$ROOT/etc/polkit-1/rules.d/49-freethinclient-power.rules"
 install -m 0644 "$SOURCE/client/kiosk.xml" "$ROOT/usr/share/freethinclient/"
+install -m 0644 "$SOURCE/client/freethinclient-info.desktop" "$ROOT/etc/xdg/autostart/"
 install -m 0644 "$SOURCE/client/freethinclient.desktop" "$ROOT/etc/xdg/autostart/"
 install -m 0644 "$SOURCE/client/freethinclient-client.service" "$ROOT/etc/systemd/system/"
 ln -s ../freethinclient-client.service "$ROOT/etc/systemd/system/multi-user.target.wants/freethinclient-client.service"

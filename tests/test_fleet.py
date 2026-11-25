@@ -124,6 +124,16 @@ class FleetTests(unittest.TestCase):
         with self.assertRaises(ValueError):fleet.validate_group({'name':'Bad','shortcuts':[item,item]})
         with self.assertRaises(ValueError):fleet.validate_group({'name':'Bad','shortcuts':[item]*13})
 
+    def test_heartbeat_delivers_current_device_name_independently_of_group_revision(self):
+        client=self.enroll();fleet.assign(self.store,{'id':client['id'],'group_id':self.group,'name':'LAB-01'})
+        first=fleet.heartbeat(self.store,client['id'],{})
+        self.assertEqual(first['device_name'],'LAB-01')
+        fleet.assign(self.store,{'id':client['id'],'group_id':self.group,'name':'LAB-02'})
+        second=fleet.heartbeat(self.store,client['id'],{})
+        self.assertEqual(second['device_name'],'LAB-02')
+        self.assertEqual(first['revision'],second['revision'])
+        with self.assertRaises(ValueError):fleet.validate_group({'name':'Bad','show_device_info':'yes'})
+
 
 class FleetApiTests(test_core.PanelTests):
     def test_client_token_cannot_read_admin_state_or_change_group(self):

@@ -319,3 +319,17 @@ saída do unsquashfs. Isso evita erros EPERM ao tentar recriar /dev/null,
 /dev/console etc. Staging de tarefas interrompidas é removido sob o lock do worker.
 O teste systemd contém device nodes na imagem e comprova a extração com CAP_MKNOD
 indisponível. A falha original não publica uma nova imagem.
+
+
+## Nome e IP no desktop
+
+O cliente mostra um quadro no canto inferior esquerdo com o nome definido em
+Máquinas e o IPv4 da interface com a rota padrão preferida. Antes da aprovação,
+ou quando não houver nome recebido do painel, usa o hostname local. A leitura
+é atualizada a cada cinco segundos; mudanças do nome chegam no heartbeat do agente.
+Se não houver IPv4 disponível, exibe Sem IPv4. Não modifica o hostname do sistema.
+
+Em Atalhos e ações → grupo, Mostrar nome e IP no desktop permite ocultar o quadro.
+Ele fica abaixo das janelas de aplicativos, fora da barra de tarefas, não recebe
+foco e fica oculto no quiosque. É um processo GTK do usuário thinclient, sem sudo.
+Atualize os componentes da imagem e reinicie o cliente para instalar o autostart.

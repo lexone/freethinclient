@@ -1,6 +1,6 @@
 'use strict';
 let shortcutDraft=null, shortcutsDirty=false, customShortcutDirty=false, shortcutOptions='';
-const shortcutChecks=['show_browser','show_rdp','show_citrix','show_shutdown','show_restart','confirm_power','show_system_icons','show_panel'];
+const shortcutChecks=['show_browser','show_rdp','show_citrix','show_shutdown','show_restart','confirm_power','show_system_icons','show_panel','show_device_info'];
 function markShortcutsDirty(){shortcutsDirty=true;$('shortcut-dirty').textContent='Alterações ainda não salvas. Clique em Salvar atalhos do grupo.';}
 function resetCustomShortcut(){ customShortcutDirty=false;$('custom-shortcut-form').reset();$('custom-shortcut-form').elements.id.value='';$('custom-shortcut-title').textContent='Novo atalho'; }
 function loadShortcutGroup(group){

@@ -256,8 +256,10 @@ def perform(job, progress, log):
         if job['action']=='client':
             client_lib=staged/'usr/local/lib/freethinclient';client_lib.mkdir(parents=True,exist_ok=True)
             assets=staged/'usr/share/freethinclient';assets.mkdir(parents=True,exist_ok=True)
-            for name in ('agent.py','session.py'):
+            for name in ('agent.py','session.py','device_info.py'):
                 shutil.copyfile(BASE/'client'/name,client_lib/name)
+            autostart=staged/'etc/xdg/autostart';autostart.mkdir(parents=True,exist_ok=True)
+            shutil.copyfile(BASE/'client/freethinclient-info.desktop',autostart/'freethinclient-info.desktop')
             policy=staged/'etc/polkit-1/rules.d/49-freethinclient-power.rules'
             policy.parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(BASE/'client/power.rules',policy)

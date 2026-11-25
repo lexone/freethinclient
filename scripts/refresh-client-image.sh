@@ -22,6 +22,7 @@ install -d -m 0755 "$ROOT/usr/share/freethinclient" "$ROOT/etc/xdg/autostart"
 install -d "$ROOT/etc/polkit-1/rules.d"
 install -m 0644 "$SOURCE/client/power.rules" "$ROOT/etc/polkit-1/rules.d/49-freethinclient-power.rules"
 install -m 0644 "$SOURCE/client/kiosk.xml" "$ROOT/usr/share/freethinclient/"
+install -m 0644 "$SOURCE/client/freethinclient-info.desktop" "$ROOT/etc/xdg/autostart/"
 install -m 0644 "$SOURCE/client/freethinclient.desktop" "$ROOT/etc/xdg/autostart/"
 for name in blue-workspace browser remote citrix shutdown restart; do
   install -m 0644 "$SOURCE/web/assets/$name.svg" "$ROOT/usr/share/freethinclient/"

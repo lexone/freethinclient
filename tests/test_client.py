@@ -16,6 +16,7 @@ def module(name):
 
 agent = module('agent')
 session = module('session')
+device_info = module('device_info')
 
 
 class ClientTests(unittest.TestCase):
@@ -168,3 +169,21 @@ class ClientTests(unittest.TestCase):
                 self.assertFalse((desktop/'restart.desktop').exists())
                 self.assertFalse((desktop/('ftc-web-'+('a'*12)+'.desktop')).exists())
                 self.assertTrue((desktop/'document.txt').exists())
+
+    def test_device_info_uses_assigned_name_and_hides_in_kiosk(self):
+        self.assertEqual(device_info.caption({'device_name':'LAB-01'},'10.9.2.194'),'Máquina: LAB-01\nIP: 10.9.2.194')
+        self.assertTrue(device_info.visible({}))
+        self.assertFalse(device_info.visible({'mode':'kiosk'}))
+        self.assertFalse(device_info.visible({'show_device_info':False}))
+        with patch.object(device_info.socket,'gethostname',return_value='host-local'):
+            self.assertIn('host-local',device_info.caption({},'Sem IPv4'))
+
+    def test_device_info_ip_uses_default_route_and_refreshes(self):
+        route=json.dumps([{'dev':'wifi0','metric':600},{'dev':'eth0','metric':100}])
+        address=json.dumps([{'addr_info':[{'family':'inet','local':'10.9.2.194'}]}])
+        replies=[device_info.subprocess.CompletedProcess([],0,stdout=route),device_info.subprocess.CompletedProcess([],0,stdout=address)]
+        with patch.object(device_info.subprocess,'run',side_effect=replies) as run:
+            self.assertEqual(device_info.current_ip(),'10.9.2.194')
+            self.assertIn('eth0',run.call_args.args[0])
+        with patch.object(device_info.subprocess,'run',side_effect=OSError):
+            self.assertEqual(device_info.current_ip(),'Sem IPv4')

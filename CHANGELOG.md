@@ -1,5 +1,7 @@
 ## Próxima revisão do piloto
 
+- Quadro no desktop com nome do painel e IPv4 atual, configurável por grupo e oculto no quiosque.
+
 - Aba Atalhos e ações por grupo com nomes, URLs HTTPS, ícones e visibilidade.
 - Ações opcionais de desligar/reiniciar com confirmação configurável e polkit restrito.
 - Atalhos web gerenciados são removidos ao desabilitar/excluir e ficam ocultos no quiosque.

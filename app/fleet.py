@@ -57,7 +57,7 @@ def validate_group(data):
     for key, default in (('lock_wallpaper', True), ('allow_usb', False), ('reconnect', True), ('mac_reenroll', False),
                          ('show_browser', True), ('show_rdp', True), ('show_citrix', True),
                          ('show_system_icons', False), ('show_panel', True), ('fullscreen', False),
-                         ('show_shutdown', False), ('show_restart', False), ('confirm_power', True)):
+                         ('show_shutdown', False), ('show_restart', False), ('confirm_power', True), ('show_device_info', True)):
         if type(data.get(key, default)) is not bool:
             raise ValueError('Opção inválida: ' + key)
         result[key] = data.get(key, default)
@@ -217,10 +217,10 @@ def heartbeat(store, identity, data):
     if ip:
         ipaddress.ip_address(ip)
     with store.connect() as db:
-        row = db.execute('SELECT approved,group_id,command,command_id,firmware FROM fleet_devices WHERE id=?', (identity,)).fetchone()
+        row = db.execute('SELECT approved,group_id,command,command_id,firmware,name FROM fleet_devices WHERE id=?', (identity,)).fetchone()
         if not row:
             raise ValueError('Máquina não encontrada')
-        approved, group_id, action, command_id, firmware = row
+        approved, group_id, action, command_id, firmware, device_name = row
         if data.get('ack') and data['ack'] == command_id:
             db.execute('UPDATE fleet_devices SET command=NULL,command_id=NULL,last_ack=? WHERE id=?', (command_id, identity))
             action = command_id = None
@@ -231,5 +231,5 @@ def heartbeat(store, identity, data):
         profile = json.loads(group[0])
         if profile['firmware'] != 'auto' and firmware != profile['firmware']:
             return dict(result, approved=False, error='Firmware diferente do definido no grupo')
-        result.update(profile=profile, revision=str(group_id) + ':' + str(group[1]))
+        result.update(profile=profile, device_name=device_name, revision=str(group_id) + ':' + str(group[1]))
     return result

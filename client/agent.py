@@ -90,7 +90,7 @@ def tick(config):
                 raise ValueError('Wallpaper divergente')
             atomic(path, raw, 0o644)
         profile['wallpaper_path'] = str(path)
-    profile.update(approved=True, revision=response['revision'] + ':' + (wallpaper['sha256'] if wallpaper else 'blue'))
+    profile.update(approved=True, device_name=response.get('device_name',socket.gethostname()), revision=response['revision'] + ':' + (wallpaper['sha256'] if wallpaper else 'blue'))
     if response.get('command') == 'reapply':
         profile['revision'] += ':' + response['command_id']
     atomic(ROOT / 'profile.json', json.dumps(profile).encode(), 0o644)

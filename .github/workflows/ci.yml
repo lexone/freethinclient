@@ -19,6 +19,11 @@ jobs:
           node tests/ui-monitor.cjs
           for script in scripts/*.sh; do bash -n "$script"; done
           python3 -m compileall -q app scripts client
+      - name: Device information widget on a disposable display
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y python3-gi gir1.2-gtk-3.0 xvfb xauth
+          timeout 15s xvfb-run -a python3 tests/smoke_device_info.py
       - name: Refresh a disposable PXE image
         run: |
           sudo apt-get update
