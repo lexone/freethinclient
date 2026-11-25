@@ -95,6 +95,22 @@ class FleetTests(unittest.TestCase):
         fleet.assign(self.store, {'id':client['id'], 'group_id':self.group})
         self.assertFalse(fleet.heartbeat(self.store, client['id'], {})['approved'])
 
+    def test_kiosk_target_validation_and_existing_group_defaults(self):
+        old=fleet.validate_group({'name':'Existing'})
+        self.assertFalse(old['show_system_icons'])
+        self.assertTrue(old['show_browser'])
+        self.assertEqual(old['kiosk_app'],'browser')
+        for target, field, value in [('citrix','citrix_url','https://citrix.example'),('rdp','rdp_host','rdp.example')]:
+            with self.assertRaises(ValueError):
+                fleet.validate_group({'name':'Kiosk','mode':'kiosk','kiosk_app':target})
+            profile=fleet.validate_group({'name':'Kiosk','mode':'kiosk','kiosk_app':target,field:value})
+            self.assertEqual(profile['kiosk_app'],target)
+        for field in ('show_browser','show_rdp','show_citrix','show_panel','show_system_icons','fullscreen'):
+            with self.assertRaises(ValueError):
+                fleet.validate_group({'name':'Invalid',field:'false'})
+        with self.assertRaises(ValueError):
+            fleet.validate_group({'name':'Invalid','kiosk_app':'shell'})
+
 
 class FleetApiTests(test_core.PanelTests):
     def test_client_token_cannot_read_admin_state_or_change_group(self):

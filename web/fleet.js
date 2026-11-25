@@ -26,7 +26,7 @@ function resetGroup(group = {}) {
   for (const [key, value] of Object.entries(group)) {const input = form.elements.namedItem(key); if (input) input.type === 'checkbox' ? input.checked = value : input.value = value;}
   form.elements.id.value = group.id || '';
   $('group-editor-title').textContent = group.id ? 'Editar ' + group.name : 'Novo grupo';
-  groupDirty = false; $('group-dirty').textContent = '';
+  groupDirty = false; $('group-dirty').textContent = ''; updateGroupOptions();
 }
 function renderGroups() {
   const signature = JSON.stringify(fleetState.groups);
@@ -92,10 +92,17 @@ function initializeFleetUI() {
   });
   $('device-search').addEventListener('input',()=>renderDevices(true));
   for (const id of ['new-group','cancel-group']) $(id).addEventListener('click',()=>{if(!groupDirty || confirm('Descartar as alterações do formulário?')) resetGroup();});
+  $('group-form').elements.mode.addEventListener('change',updateGroupOptions);
+  for (const id of ['browser-only','hide-shortcuts']) $(id).addEventListener('click',()=>{
+    const form=$('group-form');
+    for(const key of ['show_browser','show_rdp','show_citrix','show_system_icons']) form.elements[key].checked=key==='show_browser' && id==='browser-only';
+    groupDirty=true; $('group-dirty').textContent='Você tem alterações ainda não salvas.';
+  });
+  updateGroupOptions();
   $('group-form').addEventListener('input',()=>{groupDirty=true;$('group-dirty').textContent='Você tem alterações ainda não salvas.';});
   $('group-form').addEventListener('submit',async event=>{
     event.preventDefault();const data=Object.fromEntries(new FormData(event.target));
-    for(const key of ['reconnect','lock_wallpaper','allow_usb','mac_reenroll']) data[key]=event.target.elements[key].checked;
+    for(const key of ['reconnect','lock_wallpaper','allow_usb','mac_reenroll','show_browser','show_rdp','show_citrix','show_system_icons','show_panel','fullscreen']) data[key]=event.target.elements[key].checked;
     try{const result=await api('/api/groups/save',data);groupDirty=false;await refresh();resetGroup(fleetState.groups.find(group=>group.id===result.id));notify('Grupo salvo. Os agentes aprovados recebem o perfil na próxima comunicação.');}catch(error){notify(error.message,true);}
   });
   addEventListener('beforeunload',event=>{if(groupDirty){event.preventDefault();event.returnValue='';}});
@@ -154,4 +161,10 @@ function renderFleetMonitor() {
   $('fleet-monitor-counts').textContent=devices.length+' cadastradas · '+online+' online · '+pending+' pendentes';
   $('fleet-monitor-next').textContent=busy?'Consulta em andamento':fleetMonitor.next?
     (failed?'Nova tentativa em ':'Próxima consulta em ')+Math.max(0,Math.ceil((fleetMonitor.next-Date.now())/1000))+'s':'';
+}
+
+function updateGroupOptions() {
+  const mode=$('group-form').elements.mode.value, kiosk=mode==='kiosk';
+  $('kiosk-app-field').hidden=!kiosk; $('kiosk-help').hidden=!kiosk;
+  $('desktop-options').hidden=kiosk; $('fullscreen-field').hidden=kiosk || mode==='desktop' || mode==='rdp';
 }

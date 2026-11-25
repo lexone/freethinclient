@@ -199,3 +199,41 @@ os resultados anteriores são mantidos e identificados como possivelmente desatu
 Cada requisição tem limite de 15 segundos; uma nova consulta não duplica a que está em curso.
 O último contato de cada agente aparece na lista. Esse botão não faz varredura da rede
 nem mede downloads PXE. O progresso percentual do boot ainda não é enviado pelo cliente.
+
+
+## Desktop limpo e aplicativo do quiosque
+
+O grupo controla os atalhos Navegador, Área remota e Citrix, os ícones do sistema
+(Início, Lixeira e volumes) e a barra inferior. Somente navegador desmarca os demais
+atalhos e os ícones do sistema; Ocultar todos os atalhos remove os três atalhos
+gerenciados. Arquivos do usuário não são apagados. A barra tem um controle separado.
+Navegador e portal Citrix podem abrir em tela cheia mantendo o desktop.
+
+Em Quiosque com aplicativo único, selecione Chromium, portal Citrix no navegador
+ou RDP. Desktop, barra e atalhos ficam ocultos. RDP pede credenciais e mantém
+validação do certificado; Citrix ICA não está incluído. Não há campo de comandos
+arbitrários. Quiosque restringe a interface da sessão, não fornece isolamento físico
+ou uma política completa de segurança do sistema operacional.
+
+A imagem cliente precisa conter a nova session.py para aplicar essas opções.
+Atualizar somente o painel não modifica o sistema SquashFS que o PC carrega.
+Depois de atualizar o checkout e o painel, o servidor pode atualizar a imagem PXE
+existente com:
+
+```bash
+bash scripts/refresh-client-image.sh /srv/freethinclient/boot
+```
+
+O comando descompacta o SquashFS em diretório temporário, copia o agente e a sessão,
+renderiza os assets SVG em PNG, compacta uma nova imagem e guarda a anterior em
+/var/backups/freethinclient/pxe-DATA. A publicação usa troca de arquivo; kernel,
+initrd, certificado, URL do painel, boot.ipxe, DHCP e ISO não mudam. Requer espaço
+para a árvore descompactada, a nova imagem e o backup. O comando recusa imagens
+que contenham identidade de um cliente cadastrado. Reinicie o PC pelo PXE para
+carregar a imagem nova e aprove/vincule o cliente no painel conforme necessário.
+
+PNG evita depender de um loader SVG ausente na instalação mínima. O desktop define
+o wallpaper mesmo quando as propriedades ainda não existem no xfconf, respeita
+o diretório Desktop localizado do XDG e substitui os painéis padrão por uma barra
+inferior. A compilação completa também inclui o suporte SVG e os mesmos PNGs.
+A aparência e a troca de modos precisam ser conferidas no hardware do piloto.

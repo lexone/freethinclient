@@ -58,3 +58,59 @@ class ClientTests(unittest.TestCase):
         self.assertNotIn('/cert:ignore',args)
         self.assertFalse(any(arg.startswith('/p:') for arg in args))
 
+
+    def test_kiosk_target_and_browser_fullscreen(self):
+        with patch.object(session.shutil,'which',return_value='/usr/bin/chromium'):
+            args=session.application({'kiosk_app':'citrix','citrix_url':'https://portal.example'},'kiosk')
+            self.assertIn('--kiosk',args)
+            self.assertEqual(args[-1],'https://portal.example')
+            args=session.application({'homepage':'https://example.org','fullscreen':True},'browser')
+            self.assertIn('--start-fullscreen',args)
+            self.assertNotIn('--kiosk',args)
+        args=session.application({'kiosk_app':'rdp','rdp_host':'rdp.example'},'kiosk')
+        self.assertIn('/v:rdp.example',args)
+        self.assertIn('/f',args)
+        with patch.object(session.subprocess,'run') as prompt:
+            prompt.return_value.returncode=1
+            self.assertIsNone(session.launch({'kiosk_app':'rdp','rdp_host':'rdp.example'},'kiosk'))
+            self.assertEqual(prompt.call_args.args[0][0],'zenity')
+
+    def test_clean_desktop_only_removes_managed_shortcuts(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home=Path(directory)
+            desktop=home/'Desktop';desktop.mkdir()
+            (desktop/'citrix.desktop').write_text('managed')
+            (desktop/'remote.desktop').write_text('managed')
+            (desktop/'my-document.txt').write_text('personal')
+            reply=session.subprocess.CompletedProcess([],0,stdout=b'',stderr=b'')
+            with patch.object(session,'HOME',home), patch.object(session,'desktop_directory',return_value=desktop), patch.object(session,'call',return_value=reply) as command:
+                session.apply_desktop({'show_browser':True,'show_rdp':False,'show_citrix':False})
+                self.assertTrue((desktop/'browser.desktop').exists())
+                self.assertIn('browser.png',(desktop/'browser.desktop').read_text())
+                self.assertFalse((desktop/'citrix.desktop').exists())
+                self.assertFalse((desktop/'remote.desktop').exists())
+                self.assertTrue((desktop/'my-document.txt').exists())
+                calls=[c.args[0] for c in command.call_args_list]
+                self.assertTrue(any('/desktop-icons/file-icons/show-filesystem' in c and 'false' in c for c in calls))
+                self.assertTrue(any('blue-workspace.png' in ' '.join(c) for c in calls),'wallpaper must be set even when xfconf has no existing keys')
+                self.assertTrue(any('p=10;x=0;y=0' in c for c in calls))
+                session.apply_desktop({'show_browser':False,'show_rdp':False,'show_citrix':False})
+                self.assertFalse((desktop/'browser.desktop').exists())
+
+    def test_kiosk_shell_has_no_desktop_or_panel(self):
+        reply=session.subprocess.CompletedProcess([],0,stdout=b'',stderr=b'')
+        with patch.object(session.os,'getuid',return_value=1000,create=True), patch.object(session,'call',return_value=reply) as command, patch.object(session.subprocess,'Popen') as spawn:
+            session.session_shell({'mode':'kiosk'})
+            self.assertIn(['xfce4-panel','--quit'],[c.args[0] for c in command.call_args_list])
+            self.assertEqual(spawn.call_args.args[0][0],'openbox')
+
+    def test_localized_desktop_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home=Path(directory)
+            reply=session.subprocess.CompletedProcess([],0,stdout=str(home/'Área de trabalho').encode(),stderr=b'')
+            with patch.object(session,'HOME',home),patch.object(session.shutil,'which',return_value='xdg-user-dir'),patch.object(session,'call',return_value=reply):
+                self.assertEqual(session.desktop_directory(),home/'Área de trabalho')
+
+    def test_desktop_helper_timeout_does_not_abort_session(self):
+        with patch.object(session.subprocess,'run',side_effect=session.subprocess.TimeoutExpired('gio',10)):
+            self.assertEqual(session.call(['gio','set']).returncode,1)

@@ -24,7 +24,7 @@ if [[ "$ID" != debian || "${VERSION_CODENAME:-}" != bookworm ]]; then
 fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
-apt-get install -y live-build debootstrap xorriso squashfs-tools isolinux syslinux-common grub-pc-bin grub-efi-amd64-bin mtools dosfstools cpio ca-certificates
+apt-get install -y live-build debootstrap xorriso squashfs-tools isolinux syslinux-common grub-pc-bin grub-efi-amd64-bin mtools dosfstools cpio ca-certificates librsvg2-bin
 mkdir -p -- "$BUILD"
 cd -- "$BUILD"
 BUILD=$PWD
@@ -41,11 +41,13 @@ live-config
 live-config-systemd
 systemd-sysv
 xorg
+xdg-user-dirs
 lightdm
 lightdm-gtk-greeter
 xfce4
 openbox
 papirus-icon-theme
+librsvg2-common
 fonts-noto-core
 chromium
 freerdp2-x11
@@ -73,6 +75,9 @@ install -d "$ROOT/usr/local/lib/freethinclient" "$ROOT/usr/share/freethinclient"
   "$ROOT/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml"
 install -m 0644 "$SOURCE/client/agent.py" "$SOURCE/client/session.py" "$ROOT/usr/local/lib/freethinclient/"
 install -m 0644 "$SOURCE/web/assets/"*.svg "$ROOT/usr/share/freethinclient/"
+for name in blue-workspace browser remote citrix; do
+  rsvg-convert -o "$ROOT/usr/share/freethinclient/$name.png" "$SOURCE/web/assets/$name.svg"
+done
 install -m 0644 "$SOURCE/client/kiosk.xml" "$ROOT/usr/share/freethinclient/"
 install -m 0644 "$SOURCE/client/freethinclient.desktop" "$ROOT/etc/xdg/autostart/"
 install -m 0644 "$SOURCE/client/freethinclient-client.service" "$ROOT/etc/systemd/system/"

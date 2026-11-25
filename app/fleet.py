@@ -35,6 +35,10 @@ def validate_group(data):
         raise ValueError('Informe o nome do grupo')
     if result['mode'] not in MODES or result['boot_type'] not in BOOT_TYPES or result['firmware'] not in ('auto', 'bios', 'uefi'):
         raise ValueError('Modo de sessão, boot ou firmware inválido')
+    result['kiosk_app'] = data.get('kiosk_app', 'browser')
+    if result['kiosk_app'] not in ('browser', 'citrix', 'rdp'):
+        raise ValueError('Aplicativo do quiosque inválido')
+    target = result['kiosk_app'] if result['mode'] == 'kiosk' else result['mode']
     for key in ('homepage', 'citrix_url'):
         if result[key]:
             url = urlsplit(result[key])
@@ -44,13 +48,15 @@ def validate_group(data):
         raise ValueError('Destino RDP inválido')
     if result['rdp_domain'] and not re.fullmatch(r'[A-Za-z0-9._-]{1,160}', result['rdp_domain']):
         raise ValueError('Domínio inválido')
-    if result['mode'] in ('kiosk', 'browser') and not result['homepage']:
+    if target == 'browser' and not result['homepage']:
         raise ValueError('Informe a URL do navegador')
-    if result['mode'] == 'citrix' and not result['citrix_url']:
+    if target == 'citrix' and not result['citrix_url']:
         raise ValueError('Informe o portal Citrix')
-    if result['mode'] == 'rdp' and not result['rdp_host']:
+    if target == 'rdp' and not result['rdp_host']:
         raise ValueError('Informe o destino RDP')
-    for key, default in (('lock_wallpaper', True), ('allow_usb', False), ('reconnect', True), ('mac_reenroll', False)):
+    for key, default in (('lock_wallpaper', True), ('allow_usb', False), ('reconnect', True), ('mac_reenroll', False),
+                         ('show_browser', True), ('show_rdp', True), ('show_citrix', True),
+                         ('show_system_icons', False), ('show_panel', True), ('fullscreen', False)):
         if type(data.get(key, default)) is not bool:
             raise ValueError('Opção inválida: ' + key)
         result[key] = data.get(key, default)

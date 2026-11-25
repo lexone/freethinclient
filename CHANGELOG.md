@@ -1,5 +1,10 @@
 ## Próxima revisão do piloto
 
+- Desktop com atalhos selecionáveis, ícones do sistema e barra configuráveis por grupo.
+- Quiosque com navegador, portal Citrix ou RDP e opção de tela cheia no navegador.
+- Wallpaper e ícones em PNG; fallback de propriedades XFCE e diretório XDG localizado.
+- Atualização da imagem PXE existente com backup sem recompilar o Debian.
+
 - Indicador de consulta de máquinas, verificação manual, última resposta e falhas de comunicação.
 
 - Contas individuais no painel: administrador e operador, edição, senha e desativação.

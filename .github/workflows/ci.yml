@@ -17,6 +17,11 @@ jobs:
           node tests/ui-monitor.cjs
           for script in scripts/*.sh; do bash -n "$script"; done
           python3 -m compileall -q app scripts client
+      - name: Refresh a disposable PXE image
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y squashfs-tools librsvg2-bin
+          sudo bash tests/smoke_client_refresh.sh
       - name: Installer smoke test in a disposable systemd container
         run: |
           docker run -d --name ftc-smoke --privileged --cgroupns=host -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$PWD:/source:ro" ubuntu:24.04 /bin/bash -c 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y systemd systemd-sysv sudo && exec /sbin/init'
