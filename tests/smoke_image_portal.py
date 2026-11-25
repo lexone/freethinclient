@@ -19,12 +19,29 @@ def fixture(root,boot):
     (root/'boot/initrd.img-6.1.0-56-amd64').write_bytes(b'initrd-fixture')
     boot.mkdir(parents=True,exist_ok=True)
     (boot/'vmlinuz').write_bytes(b'kernel-fixture');(boot/'initrd.img').write_bytes(b'initrd-fixture')
-    subprocess.run(['mksquashfs',str(root),str(boot/'filesystem.squashfs'),'-noappend','-comp','xz'],check=True)
+    subprocess.run(['mksquashfs',str(root),str(boot/'filesystem.squashfs'),'-noappend','-comp','xz',
+                    '-p','dev d 755 0 0','-p','dev/null c 666 0 0 1 3','-p','dev/console c 600 0 0 5 1'],check=True)
     (boot/'SHA256SUMS').write_text(''.join(worker.sha(boot/name)+'  '+name+'\n' for name in worker.FILES))
     (boot/'boot.ipxe').write_text('#!ipxe\nset base http://10.9.2.175:8081\n')
 
 
 def main():
+    if '--extract-test' in sys.argv:
+        import os,stat
+        workspace=Path('/var/lib/freethinclient-image')
+        try:
+            os.mknod(workspace/'mknod-probe',stat.S_IFCHR|0o600,os.makedev(1,3))
+        except PermissionError:
+            pass
+        else:
+            raise AssertionError('The regression test must run without device creation privileges')
+        target=workspace/'device-extraction-test'
+        worker.extract_image(Path('/srv/freethinclient/boot/filesystem.squashfs'),target,workspace/'device-extraction.log')
+        assert (target/'dev').is_dir()
+        assert not list((target/'dev').iterdir()),'Archived device nodes must be excluded'
+        assert (target/'etc/debian_version').read_text()=='12.12'
+        print('Device-node extraction passed with PrivateDevices=yes; all ordinary errors remain fatal')
+        return
     with tempfile.TemporaryDirectory() as temporary:
         base=Path(temporary);boot=base/'boot';work=base/'work';work.mkdir()
         fixture(base/'root',boot)
@@ -39,6 +56,10 @@ def main():
             assert status['state']=='done',status
             assert status['versions']['chromium']=='fixture-1',status
             assert not request.exists()
+            subprocess.run(['systemd-run','--unit=ftc-device-extraction-test','--wait','--pipe',
+                '--property=PrivateDevices=yes','--property=PrivateTmp=yes','--property=ProtectSystem=strict',
+                '--property=ReadWritePaths=/var/lib/freethinclient-image',
+                'python3','/source/tests/smoke_image_portal.py','--extract-test'],check=True)
             print('Image service smoke passed under its systemd restrictions')
             return
         original=worker.run_command;namespace_calls=[]

@@ -58,6 +58,25 @@ class ImageRulesTests(unittest.TestCase):
         with self.assertRaises(ValueError):redirect.redirect_request(None,None,302,'',{},'http://dl.google.com/file')
         with self.assertRaises(ValueError):redirect.redirect_request(None,None,302,'',{},'https://evil.example/file')
 
+    def test_extraction_excludes_runtime_devices_without_ignoring_failures(self):
+        with tempfile.TemporaryDirectory() as directory:
+            target=Path(directory)/'root';target.mkdir()
+            with patch.object(image_worker,'run_command') as run:
+                image_worker.extract_image(Path('/image.squashfs'),target,Path('/log'))
+                args=run.call_args.args[0]
+                self.assertEqual(args[-3:],['-excludes',str(Path('/image.squashfs')),'dev'])
+                self.assertNotIn('-no-exit-code',args)
+                self.assertTrue((target/'dev').is_dir())
+
+    def test_cleanup_only_removes_abandoned_worker_directories(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory).resolve()
+            (root/'build-abcdefgh').mkdir();(root/'build-abcdefgh/file').write_text('temporary')
+            (root/'keep').mkdir();(root/'build-manual').mkdir()
+            with patch.object(image_worker,'WORK',root):image_worker.cleanup_staging()
+            self.assertFalse((root/'build-abcdefgh').exists())
+            self.assertTrue((root/'keep').exists());self.assertTrue((root/'build-manual').exists())
+
 
 class ImageApiTests(test_core.PanelTests):
     def test_admin_job_is_fixed_queued_once_and_audited(self):

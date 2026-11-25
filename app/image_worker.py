@@ -149,6 +149,21 @@ def run_command(args, log, timeout=1800):
         subprocess.run(args,stdout=output,stderr=subprocess.STDOUT,check=True,timeout=timeout)
 
 
+def extract_image(source, target, log):
+    # /dev is runtime state, supplied by devtmpfs at boot and by the private
+    # device mount during maintenance. Do not recreate archived device nodes.
+    run_command(['unsquashfs','-d',str(target),'-excludes',str(source),'dev'],log)
+    (target/'dev').mkdir(mode=0o755,exist_ok=True)
+
+
+def cleanup_staging():
+    # Caller holds the worker lock: any earlier build directory is abandoned.
+    for path in WORK.glob('build-*'):
+        if (not path.is_symlink() and path.is_dir() and path.resolve().parent==WORK.resolve()
+                and re.fullmatch(r'build-[a-z0-9_]{8}',path.name)):
+            shutil.rmtree(path)
+
+
 def chroot_update(root, action, package=None):
     # This branch is launched only by root in a fresh, private mount namespace.
     if action not in ('client','linux','chromium','chrome','citrix'):
@@ -228,7 +243,7 @@ def perform(job, progress, log):
     with tempfile.TemporaryDirectory(prefix='build-',dir=WORK) as directory:
         directory=Path(directory); staged=directory/'root'
         progress('preparing',1,'Descompactando uma cópia da imagem. Os clientes atuais continuam funcionando.',**details)
-        run_command(['unsquashfs','-d',str(staged),str(root/'filesystem.squashfs')],log)
+        extract_image(root/'filesystem.squashfs',staged,log)
         if not (staged/'etc/debian_version').read_text().strip().startswith('12.'):
             raise ValueError('Esta atualização suporta a imagem Debian 12; mudança de distribuição exige nova compilação')
         if (staged/'var/lib/freethinclient-client/identity.json').exists():
@@ -282,6 +297,7 @@ def run():
             fcntl.flock(app_lock,fcntl.LOCK_SH|fcntl.LOCK_NB)
             fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         except BlockingIOError: return
+        cleanup_staging()
         actor='system';job={}
         status_path=WORK/'status.json';log=WORK/'job.log'
         def progress(state,step,message,**details):

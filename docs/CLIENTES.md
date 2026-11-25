@@ -308,3 +308,14 @@ recusa atalhos personalizados e ações de energia. Para usar a nova funcionalid
 atualize o painel, aplique Atualizar componentes do cliente em Imagens e boot e
 reinicie o PC. Os nomes/URLs/visibilidade posteriores são enviados pelo agente sem
 nova reconstrução da imagem. A posição visual dos atalhos no desktop continua sujeita à organização de ícones do XFCE.
+
+
+### Extração sob PrivateDevices
+
+O worker mantém PrivateDevices=yes. A extração ignora apenas o diretório /dev
+arquivado no SquashFS e recria o diretório vazio: dispositivos são fornecidos
+pelo mount privado no chroot e pelo devtmpfs no boot. Não se ignora o código de
+saída do unsquashfs. Isso evita erros EPERM ao tentar recriar /dev/null,
+/dev/console etc. Staging de tarefas interrompidas é removido sob o lock do worker.
+O teste systemd contém device nodes na imagem e comprova a extração com CAP_MKNOD
+indisponível. A falha original não publica uma nova imagem.
