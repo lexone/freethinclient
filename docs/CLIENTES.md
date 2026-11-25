@@ -188,3 +188,14 @@ para compatibilidade com versões antigas de iPXE/EFI. O arquivo HTTP continua
 se chamando initrd.img; initrd.magic é o arquivo virtual criado pelo iPXE.
 Não é preciso reconstruir a imagem para alterar essa linha em boot.ipxe.
 Essa é uma hipótese de correção para o piloto; confirme reiniciando o cliente.
+
+
+### Acompanhamento no painel
+
+Em Máquinas, Verificar agora consulta o cadastro no servidor. O painel mostra
+consulta em andamento, hora da última resposta, próxima consulta em cinco segundos
+e contagens de máquinas cadastradas, online e pendentes. Se a consulta falhar,
+os resultados anteriores são mantidos e identificados como possivelmente desatualizados.
+Cada requisição tem limite de 15 segundos; uma nova consulta não duplica a que está em curso.
+O último contato de cada agente aparece na lista. Esse botão não faz varredura da rede
+nem mede downloads PXE. O progresso percentual do boot ainda não é enviado pelo cliente.

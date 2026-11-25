@@ -1,5 +1,7 @@
 ## Próxima revisão do piloto
 
+- Indicador de consulta de máquinas, verificação manual, última resposta e falhas de comunicação.
+
 - Contas individuais no painel: administrador e operador, edição, senha e desativação.
 - Preservação do admin instalado e revogação de sessões ao alterar uma conta.
 - Auditoria com usuário, IP e filtro; proteção do último administrador ativo.

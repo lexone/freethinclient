@@ -14,6 +14,7 @@ jobs:
           bash -n install.sh
           node --check web/app.js
           node --check web/fleet.js
+          node tests/ui-monitor.cjs
           for script in scripts/*.sh; do bash -n "$script"; done
           python3 -m compileall -q app scripts client
       - name: Installer smoke test in a disposable systemd container

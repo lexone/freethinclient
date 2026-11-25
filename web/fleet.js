@@ -52,6 +52,7 @@ function renderDevices(force = false) {
     const row = node('article','device-row'), info = node('div','device-info');
     info.append(node('h3','',device.name),node('p','mono',device.mac + (device.ip ? ' · ' + device.ip : '')),
       node('span',device.approved ? (device.online ? 'status online' : 'status') : 'status pending', !device.approved ? 'Aguardando aprovação' : device.online ? 'Online' : 'Sem comunicação'));
+    info.append(node('p','muted',device.last_seen ? 'Último contato: '+new Date(device.last_seen*1000).toLocaleString('pt-BR') : 'Agente cadastrado; aguardando primeiro contato.'));
     if (device.command) info.append(node('p','muted','Aguardando agente: ' + device.command));
     row.append(info);
     const controls = node('div','device-controls'), select = node('select',''); select.setAttribute('aria-label','Grupo de ' + device.name);
@@ -127,4 +128,30 @@ $('user-form').addEventListener('submit',async event=>{
 });
 resetUser();
 
+}
+
+const fleetMonitor = {state:'waiting', last:0, next:0, error:''};
+function setFleetMonitor(state, error = '') {
+  fleetMonitor.state=state; fleetMonitor.error=error;
+  if (state==='ready') fleetMonitor.last=Date.now();
+  if (state!=='loading') fleetMonitor.next=Date.now()+5000;
+  renderFleetMonitor();
+}
+function renderFleetMonitor() {
+  const busy=fleetMonitor.state==='loading', failed=fleetMonitor.state==='error';
+  const box=$('fleet-monitor'); box.dataset.state=fleetMonitor.state; box.setAttribute('aria-busy',String(busy));
+  $('refresh-devices').disabled=busy;
+  $('refresh-devices').textContent=busy?'Verificando…':'Verificar agora';
+  const devices=fleetState.devices, online=devices.filter(item=>item.online).length, pending=devices.filter(item=>!item.approved).length;
+  const title=busy?'Consultando o servidor…':failed?'Falha na consulta ao servidor':devices.length?'Lista atualizada':'Aguardando o primeiro agente';
+  // Only announce state transitions to assistive technology, not every countdown tick.
+  if ($('fleet-monitor-title').textContent!==title) $('fleet-monitor-title').textContent=title;
+  $('fleet-monitor-detail').textContent=busy?'Buscando cadastros e o último estado recebido dos agentes.':failed?
+    fleetMonitor.error + ' Os dados anteriores podem estar desatualizados.':devices.length?
+    'Servidor respondeu. As máquinas online enviam informações a cada 15 segundos.':
+    'Servidor respondeu, mas nenhum agente se cadastrou. Se o PC já abriu o desktop, é preciso verificar a comunicação do agente.';
+  $('fleet-monitor-last').textContent=fleetMonitor.last?'Última resposta: '+new Date(fleetMonitor.last).toLocaleTimeString('pt-BR'):'Última resposta: ainda não recebida';
+  $('fleet-monitor-counts').textContent=devices.length+' cadastradas · '+online+' online · '+pending+' pendentes';
+  $('fleet-monitor-next').textContent=busy?'Consulta em andamento':fleetMonitor.next?
+    (failed?'Nova tentativa em ':'Próxima consulta em ')+Math.max(0,Math.ceil((fleetMonitor.next-Date.now())/1000))+'s':'';
 }

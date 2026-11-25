@@ -13,7 +13,12 @@
 <div class="banner">O agente aplica os perfis em clientes provisionados. O boot PXE depende da geração da imagem e da configuração da sua rede. Consulte Imagens e boot.</div>
 </div>
 <div id="machines-page" role="tabpanel" aria-labelledby="tab-machines" data-page="machines" hidden>
-<section class="card"><div class="section-title"><div><p class="eyebrow">DISPOSITIVOS</p><h2>Máquinas do ambiente</h2></div><span class="pill" id="pending-count">0 pendentes</span></div><label class="search-label">Buscar máquina<input id="device-search" type="search" placeholder="Nome, IP ou endereço MAC" autocomplete="off"></label><p class="muted">A máquina aparece como pendente após iniciar o Linux e conectar o agente. Downloads TFTP e tentativas de PXE ainda não cadastram o dispositivo.</p><div id="device-list" class="device-list"></div></section>
+<section class="card"><div class="section-title"><div><p class="eyebrow">DISPOSITIVOS</p><h2>Máquinas do ambiente</h2></div><div class="actions"><span class="pill" id="pending-count">0 pendentes</span><button id="refresh-devices" class="secondary" type="button">Verificar agora</button></div></div>
+<div id="fleet-monitor" class="fleet-monitor" data-state="waiting" aria-busy="false">
+<div class="monitor-heading"><span class="monitor-indicator" aria-hidden="true"></span><strong id="fleet-monitor-title" role="status" aria-live="polite">Aguardando consulta</strong><span id="fleet-monitor-next" class="muted"></span></div>
+<p id="fleet-monitor-detail">Consultando os agentes cadastrados no servidor.</p>
+<div class="monitor-facts"><span id="fleet-monitor-last">Última resposta: ainda não recebida</span><span id="fleet-monitor-counts">Nenhum resultado recebido</span></div>
+</div><label class="search-label">Buscar máquina<input id="device-search" type="search" placeholder="Nome, IP ou endereço MAC" autocomplete="off"></label><p class="muted">A lista consulta o servidor automaticamente a cada 5 segundos. O PC aparece após iniciar o Linux e conectar o agente. A porcentagem do boot ainda não é informada ao painel.</p><div id="device-list" class="device-list"></div></section>
 </div>
 <div id="groups-page" role="tabpanel" aria-labelledby="tab-groups" data-page="groups" hidden>
 <div class="workspace-split"><section class="card"><div class="section-title"><div><p class="eyebrow">ORGANIZAÇÃO</p><h2>Grupos de máquinas</h2></div><button id="new-group" type="button">Novo grupo</button></div><div id="group-list" class="group-list"></div></section>

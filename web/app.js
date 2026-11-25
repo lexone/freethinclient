@@ -1,14 +1,21 @@
 'use strict';
 let auditEvents = [];
+let refreshInFlight = null;
 let csrf = '', availableVersion = '', authenticated = false, lastUpdate = '';
 const $ = id => document.getElementById(id);
 function notify(message, error = false) { $('notice').textContent = message; $('notice').className = error ? 'error' : ''; }
 async function api(path, data) {
-  const response = await fetch(path, {method: data ? 'POST' : 'GET', headers: data ? {'Content-Type': 'application/json', 'X-CSRF-Token': csrf} : {}, body: data ? JSON.stringify(data) : undefined});
-  const result = await response.json();
-  if (response.status === 401) showLogin();
-  if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
-  return result;
+  const controller = new AbortController(), timeout = setTimeout(()=>controller.abort(), 15000);
+  try {
+    const response = await fetch(path, {signal: controller.signal, method: data ? 'POST' : 'GET', headers: data ? {'Content-Type': 'application/json', 'X-CSRF-Token': csrf} : {}, body: data ? JSON.stringify(data) : undefined});
+    const result = await response.json();
+    if (response.status === 401) showLogin();
+    if (!response.ok) throw new Error(result.error || `HTTP ${response.status}`);
+    return result;
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error('O servidor não respondeu em 15 segundos.');
+    throw error;
+  } finally {clearTimeout(timeout);}
 }
 function showLogin() { authenticated = false; $('dashboard').hidden = true; $('logout').hidden = true; $('login').hidden = false; route(); }
 function renderUpdate(update) {
@@ -18,7 +25,13 @@ function renderUpdate(update) {
   $('apply-update').disabled = !availableVersion;
   $('check-update').disabled = ['checking','downloading','applying'].includes(update.state);
 }
-async function refresh(initial = false) {
+function refresh(initial = false) {
+  if (refreshInFlight) return refreshInFlight;
+  setFleetMonitor('loading');
+  refreshInFlight = loadDashboard(initial).finally(()=>{refreshInFlight=null;});
+  return refreshInFlight;
+}
+async function loadDashboard(initial) {
   try {
     const [state, fleet] = await Promise.all([api('/api/state'),api('/api/fleet')]); csrf = state.csrf; authenticated = true;
     $('login').hidden = true; $('dashboard').hidden = false; $('logout').hidden = false;
@@ -38,7 +51,8 @@ async function refresh(initial = false) {
     auditEvents = state.events; renderAudit();
     if (lastUpdate === 'applying' && state.update.state === 'updated') notify('Atualização concluída. Recarregue a página para carregar a nova interface.');
     lastUpdate = state.update.state;
-  } catch (error) { if (initial) showLogin(); else notify('Reconectando ao painel… Se a sessão expirou, entre novamente.'); }
+    setFleetMonitor('ready');
+  } catch (error) { setFleetMonitor('error', error.message); if (initial) showLogin(); }
 }
 $('login-form').addEventListener('submit', async event => {event.preventDefault(); try {const data = Object.fromEntries(new FormData(event.target));const result = await api('/api/login', data);csrf = result.csrf;event.target.elements.password.value = '';notify('');await refresh(true);} catch(error) {notify(error.message, true);} });
 $('logout').addEventListener('click', async () => {try {await api('/api/logout', {});showLogin();notify('Sessão encerrada.');}catch(error){notify(error.message,true);} });
@@ -49,7 +63,11 @@ $('apply-update').addEventListener('click', async () => {if (!availableVersion |
 initializeFleetUI();
 initializeUsersUI();
 refresh(true);
-setInterval(() => {if (authenticated) refresh();}, 5000);
+$('refresh-devices').addEventListener('click',()=>refresh());
+setInterval(()=>{
+  renderFleetMonitor();
+  if (authenticated && !refreshInFlight && Date.now() >= fleetMonitor.next) refresh();
+},1000);
 
 function renderAudit() {
   const query = $('audit-search').value.trim().toLowerCase();
