@@ -286,3 +286,25 @@ com Copyright © 2026 Everton S Oliveira, no início do Linux. A atualização d
 componentes regenera o initrd para incluir esse banner. Boot normal usa quiet e
 loglevel=3, preservando mensagens de erro. O banner usa os glifos Unicode fornecidos;
 a fonte e a largura do console determinam a apresentação no hardware.
+
+
+## Atalhos e ações por grupo
+
+A aba Atalhos e ações seleciona um grupo e permite renomear/ocultar os atalhos
+principais, escolher ícones para até 12 atalhos web HTTPS, editar/ocultar/remover
+entradas adicionais. Primeiro adicione o site à lista e depois
+salve o grupo. Alterações de perfil preservam os atalhos existentes quando o formulário
+não envia esse campo. O editor mantém alterações pendentes durante as consultas automáticas.
+
+Desligar e Reiniciar são atalhos opcionais no desktop. A confirmação de saída pode
+ser habilitada ou desabilitada. O cliente usa somente as duas ações fixas de energia
+via systemd-logind, sem sudo e sem comandos personalizados. A regra polkit vale apenas
+para o usuário thinclient em sessão local ativa; não concede gestão de serviços nem
+permissões para sessões remotas/inativas. Desabilitar um ícone controla sua exibição,
+não é uma política geral de bloqueio de energia do sistema operacional.
+
+Em quiosque, nenhum atalho ou ação do desktop é mostrado, e a chamada do lançador
+recusa atalhos personalizados e ações de energia. Para usar a nova funcionalidade,
+atualize o painel, aplique Atualizar componentes do cliente em Imagens e boot e
+reinicie o PC. Os nomes/URLs/visibilidade posteriores são enviados pelo agente sem
+nova reconstrução da imagem. A posição visual dos atalhos no desktop continua sujeita à organização de ícones do XFCE.

@@ -111,6 +111,19 @@ class FleetTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             fleet.validate_group({'name':'Invalid','kiosk_app':'shell'})
 
+    def test_shortcuts_validation_and_partial_group_save(self):
+        item={'id':'a'*12,'name':'Portal','url':'https://portal.example','icon':'browser','enabled':True}
+        fleet.save_group(self.store,{'id':self.group,'shortcuts':[item],'show_shutdown':True,'browser_title':'Internet'})
+        fleet.save_group(self.store,{'id':self.group,'description':'Nova descrição'})
+        profile=next(group for group in fleet.groups(self.store) if group['id']==self.group)
+        self.assertEqual(profile['shortcuts'],[item]);self.assertTrue(profile['show_shutdown'])
+        self.assertEqual(profile['browser_title'],'Internet')
+        for changes in ({'url':'javascript:alert(1)'},{'url':'https://user:pass@portal.example'},{'name':'bad\nname'},
+                        {'id':'../evil'},{'icon':'../../etc/passwd'},{'enabled':'false'}):
+            with self.assertRaises(ValueError):fleet.validate_group({'name':'Bad','shortcuts':[{**item,**changes}]})
+        with self.assertRaises(ValueError):fleet.validate_group({'name':'Bad','shortcuts':[item,item]})
+        with self.assertRaises(ValueError):fleet.validate_group({'name':'Bad','shortcuts':[item]*13})
+
 
 class FleetApiTests(test_core.PanelTests):
     def test_client_token_cannot_read_admin_state_or_change_group(self):

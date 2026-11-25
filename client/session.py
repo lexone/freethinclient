@@ -4,6 +4,7 @@ import json
 import hashlib
 import logging
 import os
+import re
 import shutil
 import signal
 import subprocess
@@ -39,6 +40,13 @@ def desktop_file(name, title, icon, action):
 
 
 def application(profile, mode):
+    if mode.startswith('shortcut:'):
+        if profile.get('mode')=='kiosk': return None
+        identity=mode.removeprefix('shortcut:')
+        item=next((item for item in profile.get('shortcuts',[]) if item.get('id')==identity and item.get('enabled',True)),None)
+        if not item: return None
+        profile={**profile,'homepage':item['url']}
+        mode='browser'
     kiosk = mode == 'kiosk'
     if kiosk:
         mode = profile.get('kiosk_app', 'browser')
@@ -67,6 +75,9 @@ def application(profile, mode):
 
 
 def launch(profile, mode):
+    if mode in ('shutdown','restart'):
+        power_action(profile,mode)
+        return None
     args = application(profile, mode)
     if not args:
         return None
@@ -84,6 +95,19 @@ def launch(profile, mode):
         child.stdin.close()
         return child
     return subprocess.Popen(args, start_new_session=True)
+
+
+def power_action(profile, action):
+    option='show_shutdown' if action=='shutdown' else 'show_restart'
+    if action not in ('shutdown','restart') or not profile.get('approved') or profile.get('mode')=='kiosk' or not profile.get(option,False):
+        return
+    title='Desligar' if action=='shutdown' else 'Reiniciar'
+    if profile.get('confirm_power',True):
+        reply=call(['zenity','--question','--title='+title,'--text='+title+' este computador? Salve seus arquivos antes de continuar.'])
+        if reply.returncode: return
+    result=call(['systemctl','--no-wall','poweroff' if action=='shutdown' else 'reboot'])
+    if result.returncode:
+        call(['zenity','--error','--title=FreeThinClient','--text=Não foi possível executar a ação. Consulte a administração.'])
 
 
 def desktop_directory():
@@ -154,15 +178,25 @@ def apply_desktop(profile):
     xfconf('thunar-volman', '/automount-drives/enabled', str(profile.get('allow_usb', False)).lower(), 'bool')
     xfconf('thunar-volman', '/automount-media/enabled', str(profile.get('allow_usb', False)).lower(), 'bool')
     for name, title, icon, mode, enabled in (
-            ('browser', 'Navegador', 'browser.png', 'browser', profile.get('show_browser', True)),
-            ('remote', 'Área remota', 'remote.png', 'rdp', profile.get('show_rdp', True) and profile.get('rdp_host')),
-            ('citrix', 'Citrix', 'citrix.png', 'citrix', profile.get('show_citrix', True) and profile.get('citrix_url'))):
+            ('browser', profile.get('browser_title','Navegador'), 'browser.png', 'browser', profile.get('show_browser', True)),
+            ('remote', profile.get('rdp_title','Área remota'), 'remote.png', 'rdp', profile.get('show_rdp', True) and profile.get('rdp_host')),
+            ('citrix', profile.get('citrix_title','Citrix'), 'citrix.png', 'citrix', profile.get('show_citrix', True) and profile.get('citrix_url')),
+            ('shutdown','Desligar','shutdown.png','shutdown',profile.get('show_shutdown',False)),
+            ('restart','Reiniciar','restart.png','restart',profile.get('show_restart',False))):
         if enabled and profile.get('mode') != 'kiosk':
             desktop_file(name, title, icon, mode)
         else:
             # Only remove launchers managed by this application.
             for directory in {desktop_directory(), HOME / 'Desktop'}:
                 (directory / (name + '.desktop')).unlink(missing_ok=True)
+    active=set()
+    for item in profile.get('shortcuts',[]):
+        if item.get('enabled',True) and profile.get('mode')!='kiosk' and re.fullmatch('[a-f0-9]{12}',item.get('id','')):
+            name='ftc-web-'+item['id'];active.add(name+'.desktop')
+            desktop_file(name,item['name'],item.get('icon','browser')+'.png','shortcut:'+item['id'])
+    for directory in {desktop_directory(),HOME/'Desktop'}:
+        for file in directory.glob('ftc-web-*.desktop'):
+            if file.name not in active: file.unlink(missing_ok=True)
     apply_panel()
 
 

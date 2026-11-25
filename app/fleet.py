@@ -56,10 +56,30 @@ def validate_group(data):
         raise ValueError('Informe o destino RDP')
     for key, default in (('lock_wallpaper', True), ('allow_usb', False), ('reconnect', True), ('mac_reenroll', False),
                          ('show_browser', True), ('show_rdp', True), ('show_citrix', True),
-                         ('show_system_icons', False), ('show_panel', True), ('fullscreen', False)):
+                         ('show_system_icons', False), ('show_panel', True), ('fullscreen', False),
+                         ('show_shutdown', False), ('show_restart', False), ('confirm_power', True)):
         if type(data.get(key, default)) is not bool:
             raise ValueError('Opção inválida: ' + key)
         result[key] = data.get(key, default)
+    for key,default in (('browser_title','Navegador'),('rdp_title','Área remota'),('citrix_title','Citrix')):
+        result[key]=text(data.get(key,default),80)
+        if not result[key]: raise ValueError('Informe o nome do atalho')
+    shortcuts=data.get('shortcuts',[])
+    if not isinstance(shortcuts,list) or len(shortcuts)>12:
+        raise ValueError('Cadastre no máximo 12 atalhos por grupo')
+    result['shortcuts']=[]; seen=set()
+    for item in shortcuts:
+        if not isinstance(item,dict): raise ValueError('Atalho inválido')
+        identity=text(item.get('id',''),12) or secrets.token_hex(6)
+        title=text(item.get('name',''),80); address=text(item.get('url',''),1024)
+        icon=item.get('icon','browser'); enabled=item.get('enabled',True)
+        url=urlsplit(address)
+        if not re.fullmatch('[a-f0-9]{12}',identity) or identity in seen or not title or icon not in ('browser','remote','citrix') or type(enabled) is not bool:
+            raise ValueError('Identificador, nome, ícone ou estado do atalho inválido')
+        if url.scheme!='https' or not url.hostname or url.username or url.password or any(c in address for c in ('\\','"')):
+            raise ValueError('O endereço do atalho deve usar HTTPS sem credenciais')
+        seen.add(identity)
+        result['shortcuts'].append({'id':identity,'name':title,'url':address,'icon':icon,'enabled':enabled})
     return result
 
 
@@ -85,8 +105,13 @@ def groups(store):
 
 def save_group(store, data, actor='admin'):
     import sqlite3
-    profile = validate_group(data)
     identity = text(data.get('id', ''), 40) or secrets.token_hex(12)
+    if data.get('id'):
+        with store.connect() as db:
+            previous=db.execute('SELECT profile FROM fleet_groups WHERE id=?',(identity,)).fetchone()
+        if not previous: raise ValueError('Grupo não encontrado')
+        data={**json.loads(previous[0]),**data}
+    profile = validate_group(data)
     try:
         with store.connect() as db:
             if data.get('id') and not db.execute('SELECT 1 FROM fleet_groups WHERE id=?', (identity,)).fetchone():

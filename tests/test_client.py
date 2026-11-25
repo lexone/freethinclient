@@ -126,3 +126,45 @@ class ClientTests(unittest.TestCase):
                 command.assert_called_once_with(['gio','set','-t','string',str(file),'metadata::xfce-exe-checksum',digest])
                 if os.name == "posix":
                     self.assertTrue(file.stat().st_mode & 0o100)
+
+    def test_custom_shortcuts_open_only_enabled_profile_entries(self):
+        profile={'shortcuts':[{'id':'a'*12,'name':'Portal','url':'https://portal.example','icon':'browser','enabled':True}]}
+        with patch.object(session.shutil,'which',return_value='/usr/bin/chromium'):
+            self.assertEqual(session.application(profile,'shortcut:'+('a'*12))[-1],'https://portal.example')
+            self.assertIsNone(session.application(profile,'shortcut:unknown'))
+            self.assertIsNone(session.application({**profile,'mode':'kiosk'},'shortcut:'+('a'*12)))
+            profile['shortcuts'][0]['enabled']=False
+            self.assertIsNone(session.application(profile,'shortcut:'+('a'*12)))
+
+    def test_power_buttons_enforce_profile_and_use_only_fixed_actions(self):
+        reply=session.subprocess.CompletedProcess([],0,stdout=b'',stderr=b'')
+        profile={'approved':True,'show_shutdown':True,'show_restart':True,'confirm_power':False}
+        with patch.object(session,'call',return_value=reply) as command:
+            session.power_action(profile,'shutdown')
+            command.assert_called_once_with(['systemctl','--no-wall','poweroff'])
+            command.reset_mock();session.power_action(profile,'restart')
+            command.assert_called_once_with(['systemctl','--no-wall','reboot'])
+            for changes in ({'approved':False},{'mode':'kiosk'},{'show_shutdown':False}):
+                command.reset_mock();session.power_action({**profile,**changes},'shutdown');command.assert_not_called()
+            command.reset_mock();session.power_action(profile,'arbitrary');command.assert_not_called()
+        with patch.object(session,'call',return_value=session.subprocess.CompletedProcess([],1,stdout=b'',stderr=b'')) as command:
+            session.power_action({**profile,'confirm_power':True},'shutdown')
+            self.assertEqual(command.call_count,1)
+            self.assertEqual(command.call_args.args[0][0],'zenity')
+
+    def test_desktop_custom_and_power_shortcuts_cleanup_preserves_other_files(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home=Path(directory);desktop=home/'Desktop';desktop.mkdir()
+            (desktop/'document.txt').write_text('keep')
+            reply=session.subprocess.CompletedProcess([],0,stdout=b'',stderr=b'')
+            profile={'show_shutdown':True,'show_restart':True,'shortcuts':[{'id':'a'*12,'name':'Portal','url':'https://portal.example','icon':'browser','enabled':True}]}
+            with patch.object(session,'HOME',home),patch.object(session,'desktop_directory',return_value=desktop),patch.object(session,'call',return_value=reply):
+                session.apply_desktop(profile)
+                for name in ('shutdown.desktop','restart.desktop','ftc-web-'+('a'*12)+'.desktop'):
+                    self.assertTrue((desktop/name).is_file())
+                self.assertIn('--launch shortcut:'+('a'*12),(desktop/('ftc-web-'+('a'*12)+'.desktop')).read_text())
+                session.apply_desktop({'shortcuts':[]})
+                self.assertFalse((desktop/'shutdown.desktop').exists())
+                self.assertFalse((desktop/'restart.desktop').exists())
+                self.assertFalse((desktop/('ftc-web-'+('a'*12)+'.desktop')).exists())
+                self.assertTrue((desktop/'document.txt').exists())

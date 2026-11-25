@@ -120,7 +120,7 @@ class Handler(BaseHTTPRequestHandler):
             if not file.is_file():
                 return self.reply(404, {'error': 'Não encontrado'})
             return self.reply(200, file.read_bytes(), mime='image/svg+xml')
-        if path in ("/", "/index.html", "/app.js", "/fleet.js", "/images.js", "/style.css", "/blue.css"):
+        if path in ("/", "/index.html", "/app.js", "/fleet.js", "/images.js", "/shortcuts.js", "/style.css", "/blue.css"):
             file = BASE / "web" / ("index.html" if path == "/" else path[1:])
             mime = "text/html; charset=utf-8" if file.suffix == ".html" else "text/javascript" if file.suffix == ".js" else "text/css"
             return self.reply(200, file.read_bytes(), mime=mime)

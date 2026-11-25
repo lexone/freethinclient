@@ -172,6 +172,8 @@ def chroot_update(root, action, package=None):
         subprocess.run(['chroot',str(root),'apt-get','-o','Dpkg::Options::=--force-confdef','-o','Dpkg::Options::=--force-confold',*args],check=True,env=environment)
     try:
         if action=='client':
+            if not (root/'usr/lib/polkit-1/polkitd').is_file():
+                apt('update');apt('install','-y','polkitd')
             subprocess.run(['chroot',str(root),'update-initramfs','-u','-k','all'],check=True,env=environment)
             return
         apt('update')
@@ -241,13 +243,16 @@ def perform(job, progress, log):
             assets=staged/'usr/share/freethinclient';assets.mkdir(parents=True,exist_ok=True)
             for name in ('agent.py','session.py'):
                 shutil.copyfile(BASE/'client'/name,client_lib/name)
+            policy=staged/'etc/polkit-1/rules.d/49-freethinclient-power.rules'
+            policy.parent.mkdir(parents=True,exist_ok=True)
+            shutil.copyfile(BASE/'client/power.rules',policy)
             shutil.copyfile(BASE/'client/kiosk.xml',assets/'kiosk.xml')
             shutil.copyfile(BASE/'client/boot-banner.txt',assets/'boot-banner.txt')
             for source,relative in [('initramfs-banner-hook','hooks'),('initramfs-banner','scripts/init-premount')]:
                 destination=staged/'etc/initramfs-tools'/relative/'freethinclient-banner'
                 destination.parent.mkdir(parents=True,exist_ok=True)
                 shutil.copyfile(BASE/'client'/source,destination);destination.chmod(0o755)
-            for name in ('blue-workspace','browser','remote','citrix'):
+            for name in ('blue-workspace','browser','remote','citrix','shutdown','restart'):
                 run_command(['rsvg-convert','-o',str(assets/(name+'.png')),str(BASE/'web/assets'/(name+'.svg'))],log)
         args=['unshare','--mount','--fork','--kill-child','--propagation','private',sys.executable,'-B','-m','app.image_worker',
               '--chroot',str(staged),'--action',job['action']]

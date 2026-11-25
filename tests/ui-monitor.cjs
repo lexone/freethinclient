@@ -65,6 +65,13 @@ async function main(){
   assert.equal(element('image-rollback').disabled,false);
   run("renderImages({state:'idle',worker_ready:false})");
   assert.equal(element('image-inspect').disabled,true);
+  let powerRule;
+  vm.runInNewContext(fs.readFileSync(path.join(root,'client/power.rules'),'utf8'),{polkit:{addRule:rule=>{powerRule=rule;},Result:{YES:'allowed'}}});
+  const seat={user:'thinclient',local:true,active:true};
+  assert.equal(powerRule({id:'org.freedesktop.login1.power-off'},seat),'allowed');
+  assert.equal(powerRule({id:'org.freedesktop.login1.reboot'},seat),'allowed');
+  assert.equal(powerRule({id:'org.freedesktop.systemd1.manage-units'},seat),undefined);
+  for(const change of [{user:'other'},{local:false},{active:false}]) assert.equal(powerRule({id:'org.freedesktop.login1.reboot'},{...seat,...change}),undefined);
   // Force the real API timeout handler without waiting fifteen seconds.
   let timeout;
   context.setTimeout=callback=>{timeout=callback;return 1;};context.clearTimeout=()=>{};

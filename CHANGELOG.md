@@ -1,5 +1,9 @@
 ## Próxima revisão do piloto
 
+- Aba Atalhos e ações por grupo com nomes, URLs HTTPS, ícones e visibilidade.
+- Ações opcionais de desligar/reiniciar com confirmação configurável e polkit restrito.
+- Atalhos web gerenciados são removidos ao desabilitar/excluir e ficam ocultos no quiosque.
+
 - Manutenção de imagem no portal: versões, Linux, Chromium/Chrome, Citrix Workspace e rollback.
 - Serviço root separado com ações fixas, staging, publicação versionada e auditoria.
 - Atalhos gerenciados recebem o checksum de confiança específico do XFCE.

@@ -4,6 +4,7 @@ const pages = {
   overview: ['Seu ambiente, em um só lugar.', 'Dispositivos, perfis e conexões sob seu controle.'],
   machines: ['Cada máquina, no lugar certo.', 'Aprove os dispositivos e acompanhe a comunicação com o agente.'],
   groups: ['Um perfil. Todo o grupo.', 'Defina como as máquinas iniciam e o que seus usuários podem abrir.'],
+  shortcuts: ['Seus atalhos, do seu jeito.', 'Escolha o que aparece no desktop de cada grupo.'],
   boot: ['O começo de cada workspace.', 'Imagem Linux e arquivos para inicializar seus thin clients.'],
   desktop: ['Um espaço com a sua identidade.', 'Desktop azul, ícones claros e o wallpaper da sua organização.'],
   updates: ['Seu ambiente em dia.', 'Atualizações assinadas com backup e recuperação.'],
@@ -76,7 +77,7 @@ function renderDevices(force = false) {
   $('device-list').replaceChildren(...(rows.length ? rows : [node('div','empty-state',query ? 'Nenhuma máquina corresponde à busca.' : 'Nenhum agente conectado ainda. Conclua o boot PXE para o PC solicitar aprovação.')]));
 }
 function renderFleet(fleet) {
-  fleetState = fleet; renderGroups(); renderDevices();
+  fleetState = fleet; renderGroups(); renderDevices(); renderShortcutGroups(fleet.groups);
   $('count-devices').textContent = fleet.devices.length; $('count-online').textContent = fleet.devices.filter(item=>item.online).length; $('count-groups').textContent = fleet.groups.length;
   $('pending-count').textContent = fleet.devices.filter(item=>!item.approved).length + ' pendentes';
   $('boot-files').replaceChildren(...Object.entries(fleet.boot.files).map(([name,exists])=>{const item=node('div','boot-file');item.append(node('span','mono',name),node('span',exists?'status online':'status pending',exists?'Disponível':'Ainda não gerado'));return item;}));

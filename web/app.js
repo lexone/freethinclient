@@ -65,6 +65,7 @@ $('apply-update').addEventListener('click', async () => {if (!availableVersion |
 initializeFleetUI();
 initializeUsersUI();
 initializeImagesUI();
+initializeShortcutsUI();
 refresh(true);
 $('refresh-devices').addEventListener('click',()=>refresh());
 setInterval(()=>{

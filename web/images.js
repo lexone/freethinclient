@@ -32,6 +32,11 @@ async function queueImage(data) {
   } catch(error){notify(error.message,true);await refresh();}
 }
 function initializeImagesUI() {
+  $('open-image-manager').addEventListener('click',()=>{
+    const manager=$('image-manager');
+    if(manager.hidden) return notify('Entre como administrador e atualize o painel para disponibilizar esta área.',true);
+    manager.scrollIntoView({behavior:'smooth',block:'start'});
+  });
   $('image-inspect').addEventListener('click',()=>queueImage({action:'inspect'}));
   $('image-rollback').addEventListener('click',()=>queueImage({action:'rollback'}));
   for(const button of document.querySelectorAll('[data-image-action]')) button.addEventListener('click',()=>queueImage({action:button.dataset.imageAction}));
