@@ -6,6 +6,8 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 User=root
+# Preserve credential-switch capabilities across exec with NoNewPrivileges.
+AmbientCapabilities=CAP_SETUID CAP_SETGID
 WorkingDirectory=/opt/freethinclient/current
 ExecStart=/usr/bin/python3 -B -m app.image_worker
 TimeoutStartSec=7200

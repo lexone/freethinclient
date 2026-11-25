@@ -26,6 +26,20 @@ def fixture(root,boot):
 
 
 def main():
+    if '--credentials-test' in sys.argv:
+        import os
+        # Run in a disposable process: exercise APT's temporary and final UID/GID drops.
+        os.setegid(65534)
+        os.seteuid(42)
+        assert os.geteuid()==42
+        os.seteuid(0)
+        os.setegid(0)
+        os.setgroups([])
+        os.setresgid(65534,65534,65534)
+        os.setresuid(42,42,42)
+        assert os.getresuid()==(42,42,42)
+        print('APT credential switching passed under image service restrictions')
+        return
     if '--extract-test' in sys.argv:
         import os,stat
         workspace=Path('/var/lib/freethinclient-image')
@@ -60,6 +74,18 @@ def main():
                 '--property=PrivateDevices=yes','--property=PrivateTmp=yes','--property=ProtectSystem=strict',
                 '--property=ReadWritePaths=/var/lib/freethinclient-image',
                 'python3','/source/tests/smoke_image_portal.py','--extract-test'],check=True)
+            # Copy the deployed worker's sandbox settings to the credential probe.
+            unit=Path('/etc/systemd/system/freethinclient-image.service').read_text()
+            keys={'User','AmbientCapabilities','NoNewPrivileges','PrivateTmp','PrivateDevices',
+                  'PrivateMounts','ProtectSystem','ProtectHome','ProtectKernelTunables',
+                  'ProtectKernelModules','ProtectControlGroups'}
+            properties=[]
+            for line in unit.splitlines():
+                if line.partition('=')[0] in keys:
+                    properties+=['--property='+line]
+            subprocess.run(['systemd-run','--unit=ftc-apt-credentials-test','--wait','--pipe',
+                *properties,'unshare','--mount','--fork','python3',
+                '/source/tests/smoke_image_portal.py','--credentials-test'],check=True)
             print('Image service smoke passed under its systemd restrictions')
             return
         original=worker.run_command;namespace_calls=[]
