@@ -333,3 +333,20 @@ Em Atalhos e ações → grupo, Mostrar nome e IP no desktop permite ocultar o q
 Ele fica abaixo das janelas de aplicativos, fora da barra de tarefas, não recebe
 foco e fica oculto no quiosque. É um processo GTK do usuário thinclient, sem sudo.
 Atualize os componentes da imagem e reinicie o cliente para instalar o autostart.
+
+
+### Reparação de ícones e barra no cliente
+
+A atualização de componentes verifica e instala libglib2.0-bin (gio), xdg-user-dirs,
+gvfs-daemons e polkitd quando seus executáveis estão ausentes. Copiar somente os
+scripts não supre essas dependências. O gio é necessário para registrar a confiança
+dos atalhos no XFCE; o diretório Desktop deve ser o mesmo usado pelo gerenciador.
+
+A aplicação do perfil encerra e aguarda xfdesktop e xfce4-panel antes de modificar
+os ícones e a configuração, e os inicia após terminar. Isso evita criar/remover
+ícones durante o scan inicial e consultar o PID de um painel ainda encerrando.
+O perfil aprovado já disponível é aplicado diretamente, sem uma passagem anterior
+pelo perfil vazio. A revisão só é marcada como aplicada após concluir a configuração.
+Uma falha para encerrar os componentes deixa a revisão pendente para nova tentativa.
+O CI inicia os processos XFCE reais em HOME/X11/DBus isolados e verifica os atalhos,
+seu checksum GIO, a barra e a reaplicação enquanto os componentes estão abertos.

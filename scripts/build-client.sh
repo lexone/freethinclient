@@ -63,6 +63,7 @@ ca-certificates
 curl
 dbus-x11
 gvfs
+libglib2.0-bin
 thunar-volman
 firmware-linux-free
 firmware-realtek

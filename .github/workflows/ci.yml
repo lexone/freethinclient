@@ -24,6 +24,11 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-gi gir1.2-gtk-3.0 xvfb xauth
           timeout 15s xvfb-run -a python3 tests/smoke_device_info.py
+      - name: Real Xfce desktop and panel on a disposable display
+        run: |
+          sudo apt-get install -y xfdesktop4 xfce4-panel xfwm4 xfconf dbus-x11 libglib2.0-bin gvfs xdg-user-dirs librsvg2-bin
+          desktop_test_home=$(mktemp -d /tmp/ftc-xfce-test-XXXXXXXX)
+          HOME="$desktop_test_home" timeout 90s dbus-run-session -- xvfb-run -a python3 tests/smoke_desktop_session.py
       - name: Refresh a disposable PXE image
         run: |
           sudo apt-get update

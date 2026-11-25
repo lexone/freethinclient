@@ -85,7 +85,7 @@ class ClientTests(unittest.TestCase):
             (desktop/'remote.desktop').write_text('managed')
             (desktop/'my-document.txt').write_text('personal')
             reply=session.subprocess.CompletedProcess([],0,stdout=b'',stderr=b'')
-            with patch.object(session,'HOME',home), patch.object(session,'desktop_directory',return_value=desktop), patch.object(session,'call',return_value=reply) as command:
+            with patch.object(session,'stop_component',return_value=True),patch.object(session,'HOME',home), patch.object(session,'desktop_directory',return_value=desktop), patch.object(session,'call',return_value=reply) as command:
                 session.apply_desktop({'show_browser':True,'show_rdp':False,'show_citrix':False})
                 self.assertTrue((desktop/'browser.desktop').exists())
                 self.assertIn('browser.png',(desktop/'browser.desktop').read_text())
@@ -159,7 +159,7 @@ class ClientTests(unittest.TestCase):
             (desktop/'document.txt').write_text('keep')
             reply=session.subprocess.CompletedProcess([],0,stdout=b'',stderr=b'')
             profile={'show_shutdown':True,'show_restart':True,'shortcuts':[{'id':'a'*12,'name':'Portal','url':'https://portal.example','icon':'browser','enabled':True}]}
-            with patch.object(session,'HOME',home),patch.object(session,'desktop_directory',return_value=desktop),patch.object(session,'call',return_value=reply):
+            with patch.object(session,'stop_component',return_value=True),patch.object(session,'HOME',home),patch.object(session,'desktop_directory',return_value=desktop),patch.object(session,'call',return_value=reply):
                 session.apply_desktop(profile)
                 for name in ('shutdown.desktop','restart.desktop','ftc-web-'+('a'*12)+'.desktop'):
                     self.assertTrue((desktop/name).is_file())
@@ -187,3 +187,8 @@ class ClientTests(unittest.TestCase):
             self.assertIn('eth0',run.call_args.args[0])
         with patch.object(device_info.subprocess,'run',side_effect=OSError):
             self.assertEqual(device_info.current_ip(),'Sem IPv4')
+
+    def test_revision_is_retried_if_desktop_component_cannot_stop(self):
+        with patch.object(session,'stop_component',return_value=False),patch.object(session,'desktop_file') as write:
+            self.assertFalse(session.apply_desktop({'show_shutdown':True}))
+            write.assert_not_called()

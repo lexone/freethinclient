@@ -1,5 +1,7 @@
 ## Próxima revisão do piloto
 
+- Reparação das dependências GIO/XDG na imagem e atualização do desktop/barra sem corrida de encerramento.
+
 - Quadro no desktop com nome do painel e IPv4 atual, configurável por grupo e oculto no quiosque.
 
 - Aba Atalhos e ações por grupo com nomes, URLs HTTPS, ícones e visibilidade.

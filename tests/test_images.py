@@ -77,6 +77,17 @@ class ImageRulesTests(unittest.TestCase):
             self.assertFalse((root/'build-abcdefgh').exists())
             self.assertTrue((root/'keep').exists());self.assertTrue((root/'build-manual').exists())
 
+    def test_client_update_repairs_missing_runtime_dependencies(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            missing=image_worker.missing_client_packages(root)
+            self.assertIn('libglib2.0-bin',missing);self.assertIn('xdg-user-dirs',missing)
+            (root/'usr/bin').mkdir(parents=True)
+            (root/'usr/bin/gio').write_text('fixture')
+            (root/'usr/bin/xdg-user-dir').write_text('fixture')
+            missing=image_worker.missing_client_packages(root)
+            self.assertNotIn('libglib2.0-bin',missing);self.assertNotIn('xdg-user-dirs',missing)
+
 
 class ImageApiTests(test_core.PanelTests):
     def test_admin_job_is_fixed_queued_once_and_audited(self):

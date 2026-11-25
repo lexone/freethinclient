@@ -164,6 +164,13 @@ def cleanup_staging():
             shutil.rmtree(path)
 
 
+def missing_client_packages(root):
+    required=[('polkitd','usr/lib/polkit-1/polkitd'),
+              ('libglib2.0-bin','usr/bin/gio'),('xdg-user-dirs','usr/bin/xdg-user-dir'),
+              ('gvfs-daemons','usr/libexec/gvfsd-metadata')]
+    return [package for package,binary in required if not (root/binary).is_file()]
+
+
 def chroot_update(root, action, package=None):
     # This branch is launched only by root in a fresh, private mount namespace.
     if action not in ('client','linux','chromium','chrome','citrix'):
@@ -187,8 +194,9 @@ def chroot_update(root, action, package=None):
         subprocess.run(['chroot',str(root),'apt-get','-o','Dpkg::Options::=--force-confdef','-o','Dpkg::Options::=--force-confold',*args],check=True,env=environment)
     try:
         if action=='client':
-            if not (root/'usr/lib/polkit-1/polkitd').is_file():
-                apt('update');apt('install','-y','polkitd')
+            missing=missing_client_packages(root)
+            if missing:
+                apt('update');apt('install','-y',*missing);apt('clean')
             subprocess.run(['chroot',str(root),'update-initramfs','-u','-k','all'],check=True,env=environment)
             return
         apt('update')

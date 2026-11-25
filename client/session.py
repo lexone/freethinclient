@@ -116,7 +116,9 @@ def desktop_directory():
     value = result.stdout.decode().strip() if result else ''
     path = Path(value) if value else HOME / 'Desktop'
     if not path.is_absolute() or path == HOME or HOME not in path.parents:
-        return HOME / 'Desktop'
+        path = HOME / 'Desktop'
+        if shutil.which('xdg-user-dirs-update'):
+            call(['xdg-user-dirs-update','--set','DESKTOP',str(path)])
     return path
 
 
@@ -143,9 +145,26 @@ def xfconf_array(channel, prop, values, kind='int'):
     call(args)
 
 
+def stop_component(name):
+    if name not in ('xfdesktop','xfce4-panel'):
+        raise ValueError('Componente inválido')
+    call([name,'--quit'])
+    if os.name!='posix': return True
+    args=['pgrep','-u',str(os.getuid()),'-x',name]
+    for _ in range(20):
+        if call(args).returncode: return True
+        time.sleep(0.05)
+    call(['pkill','-TERM','-u',str(os.getuid()),'-x',name])
+    for _ in range(20):
+        if call(args).returncode: return True
+        time.sleep(0.05)
+    logging.warning('Componente ainda ativo: %s; aplicação será tentada novamente.',name)
+    return False
+
+
 def apply_panel():
     # One full-width bottom bar instead of the default top panel and launcher dock.
-    call(['xfce4-panel', '--quit'])
+    xfconf('xfce4-panel','/configver',2,'int')
     xfconf_array('xfce4-panel', '/panels', [1])
     for prop, value, kind in [('position', 'p=10;x=0;y=0', 'string'), ('size', 38, 'uint'),
                               ('length', 100, 'uint'), ('length-adjust', 'false', 'bool'),
@@ -164,6 +183,12 @@ def apply_panel():
 
 
 def apply_desktop(profile):
+    # Apply the icon catalog while xfdesktop is stopped. Creating/removing icons
+    # concurrently with XFCE's initial scan can invalidate its icon objects.
+    if not stop_component('xfdesktop') or not stop_component('xfce4-panel'):
+        return False
+    if shutil.which('xdg-user-dirs-update'):
+        call(['xdg-user-dirs-update'])
     apply_wallpaper(profile)
     xfconf('xsettings', '/Net/ThemeName', 'Adwaita-dark')
     xfconf('xsettings', '/Net/IconThemeName', 'Papirus-Dark')
@@ -174,6 +199,7 @@ def apply_desktop(profile):
         xfconf('xfce4-desktop', '/desktop-icons/file-icons/' + key, system_icons, 'bool')
     for key in ('show-desktop-menu', 'show-windowlist-menu'):
         xfconf('xfce4-desktop', '/desktop-menu/' + key, 'false', 'bool')
+    xfconf('xfce4-desktop', '/desktop-icons/style', 2, 'int')
     xfconf('xfce4-desktop', '/desktop-icons/icon-size', 48, 'uint')
     xfconf('thunar-volman', '/automount-drives/enabled', str(profile.get('allow_usb', False)).lower(), 'bool')
     xfconf('thunar-volman', '/automount-media/enabled', str(profile.get('allow_usb', False)).lower(), 'bool')
@@ -198,6 +224,7 @@ def apply_desktop(profile):
         for file in directory.glob('ftc-web-*.desktop'):
             if file.name not in active: file.unlink(missing_ok=True)
     apply_panel()
+    return True
 
 
 def stop_child(child):
@@ -244,13 +271,15 @@ def main():
         return
     child, previous, mode = None, '', ''
     waiting = None
-    apply_desktop({})
-    session_shell({})
+    pending_initialized=False
     while True:
         profile = read_profile()
         if not profile.get('approved'):
             stop_child(child)
             previous = ''
+            if not pending_initialized:
+                pending_initialized=apply_desktop({})
+                if pending_initialized: session_shell({})
             if not waiting or waiting.poll() is not None:
                 waiting = subprocess.Popen(['zenity', '--info', '--title=FreeThinClient', '--width=480',
                     '--text=Conectando ao seu ambiente…\n\nAguarde o cadastro e a aprovação desta máquina no painel.'])
@@ -258,15 +287,16 @@ def main():
             continue
         if waiting and waiting.poll() is None:
             waiting.terminate()
+        pending_initialized=False
         revision = profile.get('revision', '')
         if revision != previous:
             stop_child(child)
             # The root agent never accepts arbitrary shell commands.
             mode = profile.get('mode', 'desktop')
-            previous = revision
-            apply_desktop(profile)
-            session_shell(profile)
-            child = launch(profile, mode)
+            if apply_desktop(profile):
+                session_shell(profile)
+                previous = revision
+                child = launch(profile, mode)
         elif child and child.poll() is not None and profile.get('reconnect'):
             time.sleep(3)
             child = launch(profile, mode)
