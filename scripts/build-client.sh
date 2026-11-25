@@ -16,6 +16,12 @@ if u.scheme!='https' or not u.hostname or u.username or u.password or u.path not
     raise SystemExit('Use a origem HTTPS do painel, sem caminho nem credenciais')
 PY
 [[ -f "$CA" && ! -e "$BUILD" ]] || { echo 'CA ausente ou diretório de build já existe.'; exit 1; }
+# Ubuntu ships an older, divergent live-build. Keep the BIOS/UEFI recipe
+# on Debian 12 instead of dropping options or replacing host repositories.
+source /etc/os-release
+if [[ "$ID" != debian || "${VERSION_CODENAME:-}" != bookworm ]]; then
+  exec bash "$SOURCE/scripts/build-client-isolated.sh" "$SERVER" "$CA" "$BUILD"
+fi
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y live-build debootstrap xorriso squashfs-tools isolinux syslinux-common grub-pc-bin grub-efi-amd64-bin mtools dosfstools cpio ca-certificates
@@ -100,6 +106,10 @@ rm -f /etc/sudoers.d/live
 systemctl enable lightdm NetworkManager freethinclient-client
 EOF
 chmod 0755 config/hooks/live/0900-freethinclient.hook.chroot
+if [[ ${FTC_BUILD_CONFIG_ONLY:-0} == 1 ]]; then
+  echo 'Configuração validada com live-build do Debian 12. Nenhuma ISO foi gerada.'
+  exit 0
+fi
 echo 'Gerando a imagem. Pode levar dezenas de minutos e vários GB de espaço.'
 lb build 2>&1 | tee build.log
 install -d "$BUILD/output"

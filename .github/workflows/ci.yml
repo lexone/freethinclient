@@ -14,7 +14,7 @@ jobs:
           bash -n install.sh
           node --check web/app.js
           node --check web/fleet.js
-          bash -n scripts/build-client.sh scripts/setup-boot.sh scripts/upgrade-local.sh
+          for script in scripts/*.sh; do bash -n "$script"; done
           python3 -m compileall -q app scripts client
       - name: Installer smoke test in a disposable systemd container
         run: |
@@ -34,3 +34,14 @@ jobs:
       - name: Clean smoke container
         if: always()
         run: docker rm -f ftc-smoke || true
+  client-config:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Exercise Ubuntu host and Debian 12 live-build configuration
+        run: |
+          openssl req -x509 -nodes -newkey rsa:2048 -days 1 -keyout /tmp/ftc-test.key -out /tmp/ftc-test.crt -subj /CN=127.0.0.1 -addext subjectAltName=IP:127.0.0.1
+          sudo env FTC_BUILD_CONFIG_ONLY=1 bash scripts/build-client.sh https://127.0.0.1:8443 /tmp/ftc-test.crt /var/tmp/ftc-client-config
+          test -f /var/tmp/ftc-client-config/builder-root/work/config/binary
+          test -f /var/tmp/ftc-client-config/builder-root/work/config/hooks/live/0900-freethinclient.hook.chroot

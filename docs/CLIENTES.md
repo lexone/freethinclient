@@ -35,8 +35,12 @@ Para as atualizações assinadas regulares, continue usando o fluxo de releases.
 
 ## Gerar imagem em Linux
 
-Use uma VM de build amd64 Ubuntu/Debian com pelo menos 30 GB livres e acesso
-aos repositórios Debian. O build instala as ferramentas no builder. Exemplo:
+Use uma VM de build amd64 Ubuntu/Debian com pelo menos 40 GB livres e acesso
+aos repositórios Debian. No Ubuntu, o script prepara um ambiente Debian 12
+com debootstrap e executa live-build dentro dele, em um namespace de montagem
+privado. O live-build antigo do Ubuntu não é usado e os repositórios do
+servidor não são substituídos. Não requer Docker. Em Debian 12, o build é nativo.
+Exemplo:
 
 ```bash
 sudo bash scripts/build-client.sh \
@@ -45,7 +49,8 @@ sudo bash scripts/build-client.sh \
   /var/tmp/ftc-blue-build-01
 ```
 
-O último caminho deve ser novo. O certificado precisa conter o IP/DNS usado
+O último caminho deve ser novo. Se uma tentativa falhou, preserve o diretório
+para diagnóstico e escolha outro, por exemplo `/var/tmp/ftc-blue-build-02`. O certificado precisa conter o IP/DNS usado
 na URL. A imagem incorpora apenas endereço e CA pública; nunca senha do painel
 nem token GitHub. O agente valida HTTPS e rejeita redirecionamentos.
 
