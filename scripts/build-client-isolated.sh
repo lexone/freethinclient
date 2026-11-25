@@ -17,7 +17,7 @@ install -d -m 0755 "$BUILD"
 BUILDER="$BUILD/builder-root"
 echo 'Preparando ambiente Debian 12 isolado para compatibilidade do live-build.'
 # Require authenticated Debian Release metadata; never disable signature checks.
-debootstrap --arch=amd64 --variant=minbase --include=ca-certificates \
+debootstrap --arch=amd64 --variant=minbase --include=ca-certificates,python3 \
   --force-check-gpg --keyring=/usr/share/keyrings/debian-archive-keyring.gpg \
   bookworm "$BUILDER" https://deb.debian.org/debian
 install -d "$BUILDER/opt/freethinclient-source"
