@@ -24,10 +24,11 @@ class DnsTests(unittest.TestCase):
     def test_dns_updates_only_owned_snippet_and_reloads_without_link_restart(self):
         with tempfile.TemporaryDirectory() as temporary:
             config=Path(temporary)/'nm/90-freethinclient-dns.conf';state=Path(temporary)/'dns-status.json'
-            profile={'approved':True,'dns_override':True,'dns_servers':['10.240.0.4'],'dns_search':['ubec.br']}
+            profile={'approved':True,'dns_override':True,'dns_servers':['10.240.0.4','10.240.0.12'],'dns_search':['ubec.br','lab.ubec.br']}
             with patch.object(dns_config,'CONFIG',config),patch.object(dns_config,'STATE',state),patch.object(dns_config.subprocess,'run') as run:
                 self.assertEqual(dns_config.apply(profile)['state'],'applied')
-                self.assertIn('[global-dns-domain-*]\nservers=10.240.0.4',config.read_text())
+                self.assertIn('[global-dns-domain-*]\nservers=10.240.0.4,10.240.0.12',config.read_text())
+                self.assertIn('searches=ubec.br,lab.ubec.br',config.read_text())
                 run.assert_called_once_with(['nmcli','general','reload','conf','dns-rc'],check=True,capture_output=True,timeout=15)
                 dns_config.apply(profile);self.assertEqual(run.call_count,1)
                 self.assertEqual(dns_config.apply({'approved':False})['state'],'dhcp')

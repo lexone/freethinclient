@@ -47,8 +47,8 @@ def configuration(profile):
     addresses=servers(profile.get('dns_servers',[]));searches=domains(profile.get('dns_search',[]))
     if not addresses: raise ValueError('Informe pelo menos um servidor DNS')
     return ('# Managed by FreeThinClient; remove only through the group profile.\n'
-            '[global-dns]\nsearches='+';'.join(searches)+'\n\n'
-            '[global-dns-domain-*]\nservers='+';'.join(addresses)+'\n')
+            '[global-dns]\nsearches='+','.join(searches)+'\n\n'
+            '[global-dns-domain-*]\nservers='+','.join(addresses)+'\n')
 
 
 def atomic(path,value):
