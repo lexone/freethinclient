@@ -58,6 +58,9 @@ gir1.2-gtk-3.0
 zenity
 network-manager
 network-manager-gnome
+wpasupplicant
+wireless-regdb
+rfkill
 iproute2
 ca-certificates
 curl
@@ -75,17 +78,18 @@ install -d "$ROOT/usr/local/lib/freethinclient" "$ROOT/usr/share/freethinclient"
   "$ROOT/etc/freethinclient-client" "$ROOT/etc/xdg/autostart" "$ROOT/etc/lightdm/lightdm.conf.d" \
   "$ROOT/etc/systemd/system/multi-user.target.wants" "$ROOT/var/lib/freethinclient-client" \
   "$ROOT/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml"
-install -m 0644 "$SOURCE/client/agent.py" "$SOURCE/client/session.py" "$SOURCE/client/device_info.py" "$ROOT/usr/local/lib/freethinclient/"
+install -m 0644 "$SOURCE/client/agent.py" "$SOURCE/client/session.py" "$SOURCE/client/device_info.py" "$SOURCE/client/launch_options.py" "$SOURCE/client/network.py" "$SOURCE/client/dns_config.py" "$ROOT/usr/local/lib/freethinclient/"
 install -m 0644 "$SOURCE/web/assets/"*.svg "$ROOT/usr/share/freethinclient/"
-for name in blue-workspace browser remote citrix shutdown restart; do
+for name in blue-workspace browser remote citrix shutdown restart network; do
   rsvg-convert -o "$ROOT/usr/share/freethinclient/$name.png" "$SOURCE/web/assets/$name.svg"
 done
 install -d "$ROOT/etc/initramfs-tools/hooks" "$ROOT/etc/initramfs-tools/scripts/init-premount"
 install -m 0644 "$SOURCE/client/boot-banner.txt" "$ROOT/usr/share/freethinclient/"
 install -m 0755 "$SOURCE/client/initramfs-banner-hook" "$ROOT/etc/initramfs-tools/hooks/freethinclient-banner"
 install -m 0755 "$SOURCE/client/initramfs-banner" "$ROOT/etc/initramfs-tools/scripts/init-premount/freethinclient-banner"
-install -d "$ROOT/etc/polkit-1/rules.d"
+install -d "$ROOT/etc/polkit-1/rules.d" "$ROOT/etc/NetworkManager/conf.d"
 install -m 0644 "$SOURCE/client/power.rules" "$ROOT/etc/polkit-1/rules.d/49-freethinclient-power.rules"
+install -m 0644 "$SOURCE/client/network.rules" "$ROOT/etc/polkit-1/rules.d/10-freethinclient-network.rules"
 install -m 0644 "$SOURCE/client/kiosk.xml" "$ROOT/usr/share/freethinclient/"
 install -m 0644 "$SOURCE/client/freethinclient-info.desktop" "$ROOT/etc/xdg/autostart/"
 install -m 0644 "$SOURCE/client/freethinclient.desktop" "$ROOT/etc/xdg/autostart/"

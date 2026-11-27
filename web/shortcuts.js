@@ -1,6 +1,6 @@
 'use strict';
 let shortcutDraft=null, shortcutsDirty=false, customShortcutDirty=false, shortcutOptions='';
-const shortcutChecks=['show_browser','show_rdp','show_citrix','show_shutdown','show_restart','confirm_power','show_system_icons','show_panel','show_device_info'];
+const shortcutChecks=['show_browser','show_rdp','show_citrix','show_shutdown','show_restart','confirm_power','show_system_icons','show_panel','show_device_info','allow_network_settings'];
 function markShortcutsDirty(){shortcutsDirty=true;$('shortcut-dirty').textContent='Alterações ainda não salvas. Clique em Salvar atalhos do grupo.';}
 function resetCustomShortcut(){ customShortcutDirty=false;$('custom-shortcut-form').reset();$('custom-shortcut-form').elements.id.value='';$('custom-shortcut-title').textContent='Novo atalho'; }
 function loadShortcutGroup(group){
@@ -28,10 +28,10 @@ function renderCustomShortcuts(){
   const list=shortcutDraft?.shortcuts || [];
   $('custom-shortcut-list').replaceChildren(...(list.length?list.map((item,index)=>{
     const row=node('article','shortcut-item'), icon=node('img','');icon.src='/assets/'+item.icon+'.svg';icon.alt='';
-    const info=node('div','');info.append(node('h3','',item.name),node('p','muted',item.url));
+    const info=node('div','');info.append(node('h3','',item.name),node('p','muted',item.url),node('p','muted',({inherit:'Padrão do navegador',window:'Janela',fullscreen:'Tela inteira',kiosk:'Quiosque'}[item.window_mode || 'inherit'])+(item.autostart?' · Abre ao iniciar':'')));
     const actions=node('div','actions'), visible=node('input','');visible.type='checkbox';visible.checked=item.enabled!==false;
     visible.setAttribute('aria-label','Mostrar '+item.name);visible.addEventListener('change',()=>{item.enabled=visible.checked;markShortcutsDirty();});
-    const edit=actionButton('Editar',()=>{const form=$('custom-shortcut-form');for(const key of ['id','name','url','icon'])form.elements[key].value=item[key];$('custom-shortcut-title').textContent='Editar '+item.name;form.elements.name.focus();});
+    const edit=actionButton('Editar',()=>{const form=$('custom-shortcut-form');for(const key of ['id','name','url','icon','arguments'])form.elements[key].value=item[key] || '';form.elements.window_mode.value=item.window_mode || 'inherit';form.elements.autostart.checked=!!item.autostart;$('custom-shortcut-title').textContent='Editar '+item.name;form.elements.name.focus();});
     const remove=actionButton('Remover',()=>{list.splice(index,1);markShortcutsDirty();renderCustomShortcuts();});
     actions.append(visible,edit,remove);row.append(icon,info,actions);return row;
   }):[node('p','empty-state','Nenhum atalho adicional. Adicione um site abaixo.')]));
@@ -57,7 +57,7 @@ function initializeShortcutsUI(){
     const index=list.findIndex(item=>item.id===data.id);
     if(index<0 && list.length>=12)return notify('O grupo aceita até 12 atalhos adicionais.',true);
     if(!data.id)data.id=Array.from(crypto.getRandomValues(new Uint8Array(6)),byte=>byte.toString(16).padStart(2,'0')).join('');
-    data.enabled=index<0?true:list[index].enabled;
+    data.enabled=index<0?true:list[index].enabled;data.autostart=event.target.elements.autostart.checked;
     index<0?list.push(data):list.splice(index,1,data);
     markShortcutsDirty();renderCustomShortcuts();resetCustomShortcut();
   });

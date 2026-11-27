@@ -108,6 +108,11 @@ def main():
             assert 'metadata::xfce-exe-checksum' in script
             info=subprocess.check_output(['unsquashfs','-cat',str(current/'filesystem.squashfs'),'etc/xdg/autostart/freethinclient-info.desktop']).decode()
             assert 'device_info.py' in info
+            for name in ('launch_options.py','network.py','dns_config.py'):
+                shipped=subprocess.check_output(['unsquashfs','-cat',str(current/'filesystem.squashfs'),'usr/local/lib/freethinclient/'+name])
+                assert shipped==(worker.BASE/'client'/name).read_bytes()
+            rule=subprocess.check_output(['unsquashfs','-cat',str(current/'filesystem.squashfs'),'etc/polkit-1/rules.d/10-freethinclient-network.rules']).decode()
+            assert 'allow_network_settings' in rule
             result=worker.perform({'action':'rollback','id':'b'*24},lambda *a,**k:None,work/'job.log')
             assert worker.source_image()[0].name==previous
             assert result['versions']['chromium']=='fixture-1'

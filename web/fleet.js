@@ -54,6 +54,7 @@ function renderDevices(force = false) {
     info.append(node('h3','',device.name),node('p','mono',device.mac + (device.ip ? ' · ' + device.ip : '')),
       node('span',device.approved ? (device.online ? 'status online' : 'status') : 'status pending', !device.approved ? 'Aguardando aprovação' : device.online ? 'Online' : 'Sem comunicação'));
     info.append(node('p','muted',device.last_seen ? 'Último contato: '+new Date(device.last_seen*1000).toLocaleString('pt-BR') : 'Agente cadastrado; aguardando primeiro contato.'));
+    if (device.dns_status?.message) info.append(node('p','muted','DNS: '+device.dns_status.message));
     if (device.command) info.append(node('p','muted','Aguardando agente: ' + device.command));
     row.append(info);
     const controls = node('div','device-controls'), select = node('select',''); select.setAttribute('aria-label','Grupo de ' + device.name);
@@ -77,7 +78,7 @@ function renderDevices(force = false) {
   $('device-list').replaceChildren(...(rows.length ? rows : [node('div','empty-state',query ? 'Nenhuma máquina corresponde à busca.' : 'Nenhum agente conectado ainda. Conclua o boot PXE para o PC solicitar aprovação.')]));
 }
 function renderFleet(fleet) {
-  fleetState = fleet; renderGroups(); renderDevices(); renderShortcutGroups(fleet.groups);
+  fleetState = fleet; renderGroups(); renderDevices(); renderShortcutGroups(fleet.groups); renderNetworkGroups(fleet.groups);
   $('count-devices').textContent = fleet.devices.length; $('count-online').textContent = fleet.devices.filter(item=>item.online).length; $('count-groups').textContent = fleet.groups.length;
   $('pending-count').textContent = fleet.devices.filter(item=>!item.approved).length + ' pendentes';
   $('boot-files').replaceChildren(...Object.entries(fleet.boot.files).map(([name,exists])=>{const item=node('div','boot-file');item.append(node('span','mono',name),node('span',exists?'status online':'status pending',exists?'Disponível':'Ainda não gerado'));return item;}));
@@ -103,7 +104,7 @@ function initializeFleetUI() {
   $('group-form').addEventListener('input',()=>{groupDirty=true;$('group-dirty').textContent='Você tem alterações ainda não salvas.';});
   $('group-form').addEventListener('submit',async event=>{
     event.preventDefault();const data=Object.fromEntries(new FormData(event.target));
-    for(const key of ['reconnect','lock_wallpaper','allow_usb','mac_reenroll','show_browser','show_rdp','show_citrix','show_system_icons','show_panel','fullscreen']) data[key]=event.target.elements[key].checked;
+    for(const key of ['reconnect','lock_wallpaper','allow_usb','mac_reenroll','show_browser','show_rdp','show_citrix','show_system_icons','show_panel','fullscreen','allow_network_settings','rdp_prompt_server','browser_autostart','citrix_autostart','rdp_autostart']) data[key]=event.target.elements[key].checked;
     try{const result=await api('/api/groups/save',data);groupDirty=false;await refresh();resetGroup(fleetState.groups.find(group=>group.id===result.id));notify('Grupo salvo. Os agentes aprovados recebem o perfil na próxima comunicação.');}catch(error){notify(error.message,true);}
   });
   addEventListener('beforeunload',event=>{if(groupDirty){event.preventDefault();event.returnValue='';}});

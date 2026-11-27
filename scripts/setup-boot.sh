@@ -24,7 +24,7 @@ cat > /srv/freethinclient/boot/boot.ipxe <<EOF
 # iPXE project: https://ipxe.org
 dhcp
 set base http://$SERVER:8081
-kernel \${base}/vmlinuz initrd=initrd.magic boot=live quiet loglevel=3 components username=thinclient hostname=freethinclient locales=pt_BR.UTF-8 keyboard-layouts=br timezone=America/Sao_Paulo ip=dhcp fetch=\${base}/filesystem.squashfs nopersistence
+kernel \${base}/vmlinuz initrd=initrd.magic boot=live quiet loglevel=3 components username=thinclient hostname=freethinclient locales=pt_BR.UTF-8 keyboard-layouts=br timezone=America/Sao_Paulo fetch=\${base}/filesystem.squashfs nopersistence
 initrd \${base}/initrd.img
 boot
 EOF

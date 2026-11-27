@@ -350,3 +350,105 @@ pelo perfil vazio. A revisão só é marcada como aplicada após concluir a conf
 Uma falha para encerrar os componentes deixa a revisão pendente para nova tentativa.
 O CI inicia os processos XFCE reais em HOME/X11/DBus isolados e verifica os atalhos,
 seu checksum GIO, a barra e a reaplicação enquanto os componentes estão abertos.
+
+
+## Inicialização de aplicativos e conexão RDP
+
+Em **Grupos e perfis**, cada aplicativo tem seu modo de abertura: padrão do grupo,
+janela, tela inteira ou quiosque. No modo Desktop, os marcadores de inicialização
+abrem navegador, portal Citrix, RDP e os sites adicionais selecionados. Em outros
+modos do grupo, apenas o aplicativo principal é iniciado. O quiosque do grupo
+remove desktop e barra; o modo quiosque de um atalho abre aquele navegador em
+quiosque mantendo o restante da sessão desktop. Tela inteira RDP usa /f; janela
+omite esse parâmetro. O portal Citrix usa Chrome/Chromium; essas opções não
+substituem a configuração dos aplicativos ICA nativos do Citrix Workspace.
+
+Para RDP direto ao iniciar, selecione **Conectar diretamente por RDP ao iniciar**
+e informe servidor e domínio. A conta e senha são solicitadas no cliente; a senha
+segue pelo stdin do FreeRDP e não integra parâmetros ou perfil. Para um atalho que
+permita escolher o servidor, marque **Perguntar o servidor ao abrir o RDP** e
+**Atalho Área remota (RDP)**. Esse atalho funciona mesmo sem um destino fixo.
+
+Atalhos web em **Atalhos e ações** também têm modo de abertura, parâmetros e
+**Abrir este site junto com o desktop**. Cada lançador usa seu próprio diretório
+de perfil do navegador, impedindo que uma instância existente ignore outro modo.
+Após salvar, o agente reaplica o perfil e pode reiniciar aplicativos automáticos.
+
+Parâmetros são separados com shlex e executados como lista de argumentos, sem
+shell. O servidor e o cliente validam a mesma lista de opções. Não são aceitos
+executáveis, senhas, troca de destino por parâmetro, desativação de certificados,
+depuração remota, extensões locais ou --no-sandbox. Use os campos próprios para
+URL, destino RDP e modo de janela. Exemplos e opções aceitas:
+
+- Navegador/Citrix web: --incognito, --disable-gpu, --disable-dev-shm-usage,
+  --disable-pinch, --start-maximized, --kiosk-printing, --window-size=1280,800,
+  --window-position=0,0, --lang=pt-BR, --force-device-scale-factor=1.25 (0.5 a 3),
+  --overscroll-history-navigation=0, --proxy-server=http://proxy.example:8080
+  (HTTP/HTTPS/SOCKS4/SOCKS5, com porta, sem credenciais),
+  --proxy-bypass-list="*.local;<local>".
+- RDP: /multimon, /span, +clipboard, -clipboard, /clipboard,
+  /dynamic-resolution, +dynamic-resolution, -dynamic-resolution, /smart-sizing,
+  /sound, /microphone, +fonts, -fonts, +compression, -compression,
+  +wallpaper, -wallpaper, /auto-reconnect, /size:1440x900, /bpp:16|24|32,
+  /network:modem|broadband|broadband-low|broadband-high|wan|lan|auto,
+  /scale:100|140|180 e /timeout:30 (1 a 999).
+
+## Permissão de rede e teste de Wi-Fi
+
+**Permitir que o usuário altere IP, DNS e conexões de rede/Wi-Fi** vem desmarcado.
+A opção também está em **Atalhos e ações**. Quando habilitada para uma máquina
+aprovada, cria **Rede e Wi-Fi** e inclui a bandeja de rede na barra inferior.
+O atalho oferece **Conectar rede / Wi-Fi** (nmtui-connect), **Editar IP e DNS**
+(nm-connection-editor) e diagnóstico de interfaces, rotas, DNS, bloqueios de rádio,
+resolução do site inicial e acesso TCP 443. Um socket TCP bem-sucedido não confirma
+TLS, proxy ou autenticação. O diagnóstico não modifica a rede nem mostra senhas
+Wi-Fi; a resposta DNS depende do timeout do resolvedor do sistema.
+
+O bloqueio é aplicado no polkit do NetworkManager, além de ocultar os controles.
+Somente o usuário thinclient em uma sessão local ativa, com perfil aprovado e
+permissão explicitamente verdadeira, pode controlar a rede e editar conexões.
+O perfil é escrito pelo agente root; o usuário do desktop não pode alterá-lo.
+Revogar a opção remove o atalho e bloqueia novas alterações; não desfaz uma
+configuração de rede já aplicada. A janela fecha ao detectar a revogação.
+Outros usuários e serviços do sistema mantêm suas políticas existentes.
+
+A atualização de componentes instala NetworkManager, seu editor gráfico,
+wpasupplicant, wireless-regdb e rfkill quando faltam. A imagem completa inclui
+firmware Intel e Realtek; outras placas podem precisar de firmware específico.
+A permissão não grava senhas ou perfis de rede no servidor. Em PXE sem
+persistência, configurações locais podem desaparecer no reinício. Conectar Wi-Fi
+ou alterar a interface em uso pode interromper o agente até recuperar acesso
+ao servidor. Ethernet e Wi-Fi ligados ao mesmo tempo podem usar a rota Ethernet;
+confira o diagnóstico antes de concluir qual conexão está sendo testada.
+
+Após instalar esta versão no servidor, aplique **Imagens e boot → Atualizar
+componentes do cliente**, aguarde a conclusão e reinicie o PC pelo PXE uma vez.
+As mudanças seguintes de perfil chegam por heartbeat, sem recompilar novamente.
+
+
+## DNS configurado pela gerência
+
+A aba **Rede e DNS** seleciona um grupo e oferece DNS automático da conexão/DHCP,
+DNS manual IPv4/IPv6 e domínios de pesquisa opcionais. A tela também mostra o
+último resultado informado por cada agente: configurado, sem imposição do grupo
+ou falha. É o estado da aplicação, não uma comprovação de acesso à internet.
+Agentes antigos aparecem como aguardando suporte; atualize a imagem primeiro.
+
+O agente root valida novamente os endereços e grava somente seu arquivo
+/etc/NetworkManager/conf.d/90-freethinclient-dns.conf. O arquivo usa as seções
+global-dns e global-dns-domain-* do NetworkManager. Configurações globais
+substituem os DNS e domínios das conexões ativas enquanto a opção estiver ligada;
+preencha o domínio de pesquisa se precisar resolver nomes internos curtos.
+O agente recarrega configuração e resolvedor com nmcli general reload conf dns-rc,
+sem derrubar interfaces ou mudar IP/gateway. Desmarcar a opção ou revogar a
+aprovação remove somente esse arquivo e recarrega a configuração das conexões.
+Falhas são registradas e tentadas novamente; o cliente precisa alcançar o servidor
+para receber escolhas novas. O agente recebe escrita apenas no diretório de
+snippets NM, além do seu diretório de estado, e nunca aceita caminhos ou shell
+vindos do perfil. As definições do grupo são reaplicadas após boot por PXE.
+
+O boot agora omite ip=dhcp: no Debian Live, DHCP já é o padrão. A sintaxe ip= do
+live-boot descreve uma configuração estática e pode gerar o DNS inválido
+“nameserver dhcp”. A correção está nos dois geradores de boot.ipxe (publicação
+inicial e novas imagens/rollback). A origem deste defeito foi confirmada no piloto
+pela combinação de IP/rota válidos e esse valor literal em /etc/resolv.conf.

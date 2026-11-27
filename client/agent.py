@@ -11,6 +11,10 @@ import time
 import urllib.error
 import urllib.request
 from pathlib import Path
+try:
+    from client import dns_config
+except ModuleNotFoundError:
+    import dns_config
 
 ROOT = Path('/var/lib/freethinclient-client')
 CONFIG = Path('/etc/freethinclient-client/config.json')
@@ -75,9 +79,10 @@ def tick(config):
     identity = json.loads(identity_path.read_text())
     ack_path = ROOT / 'ack'
     ack = ack_path.read_text().strip() if ack_path.exists() else ''
-    response = json.loads(request(config, '/api/client/heartbeat', {'ip': client_ip(), 'ack': ack}, identity['token']))
+    response = json.loads(request(config, '/api/client/heartbeat', {'ip': client_ip(), 'ack': ack, 'dns_status':dns_config.status()}, identity['token']))
     if not response.get('approved'):
         atomic(ROOT / 'profile.json', json.dumps({'approved': False}).encode(), 0o644)
+        dns_config.apply({'approved':False})
         return
     profile = response['profile']
     wallpaper = response.get('wallpaper')
@@ -94,6 +99,7 @@ def tick(config):
     if response.get('command') == 'reapply':
         profile['revision'] += ':' + response['command_id']
     atomic(ROOT / 'profile.json', json.dumps(profile).encode(), 0o644)
+    dns_config.apply(profile)
     action, command_id = response.get('command'), response.get('command_id')
     if action and command_id and ack != command_id:
         # Persist before requesting an ack so commands are not replayed after reboot.

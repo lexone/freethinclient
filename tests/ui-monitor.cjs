@@ -72,6 +72,20 @@ async function main(){
   assert.equal(powerRule({id:'org.freedesktop.login1.reboot'},seat),'allowed');
   assert.equal(powerRule({id:'org.freedesktop.systemd1.manage-units'},seat),undefined);
   for(const change of [{user:'other'},{local:false},{active:false}]) assert.equal(powerRule({id:'org.freedesktop.login1.reboot'},{...seat,...change}),undefined);
+  let networkRule, networkProfile={approved:true,allow_network_settings:true};
+  vm.runInNewContext(fs.readFileSync(path.join(root,'client/network.rules'),'utf8'),{polkit:{addRule:rule=>{networkRule=rule;},spawn:()=>JSON.stringify(networkProfile),Result:{YES:'allowed',NO:'denied'}}});
+  const nm=id=>({id:'org.freedesktop.NetworkManager.'+id});
+  for(const action of ['network-control','wifi.scan','settings.modify.own','settings.modify.system','enable-disable-wifi']) assert.equal(networkRule(nm(action),seat),'allowed');
+  assert.equal(networkRule(nm('settings.modify.hostname'),seat),'denied');
+  networkProfile.allow_network_settings=false;
+  assert.equal(networkRule(nm('network-control'),seat),'denied');
+  networkProfile={approved:false,allow_network_settings:true};
+  assert.equal(networkRule(nm('settings.modify.system'),seat),'denied');
+  networkProfile={approved:true,allow_network_settings:true};
+  assert.equal(networkRule(nm('network-control'),{...seat,local:false}),'denied');
+  assert.equal(networkRule(nm('network-control'),{...seat,active:false}),'denied');
+  assert.equal(networkRule(nm('network-control'),{...seat,user:'other'}),undefined);
+  assert.equal(networkRule({id:'org.freedesktop.systemd1.manage-units'},seat),undefined);
   // Force the real API timeout handler without waiting fifteen seconds.
   let timeout;
   context.setTimeout=callback=>{timeout=callback;return 1;};context.clearTimeout=()=>{};

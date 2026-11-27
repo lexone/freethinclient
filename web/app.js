@@ -66,6 +66,7 @@ initializeFleetUI();
 initializeUsersUI();
 initializeImagesUI();
 initializeShortcutsUI();
+initializeNetworkUI();
 refresh(true);
 $('refresh-devices').addEventListener('click',()=>refresh());
 setInterval(()=>{

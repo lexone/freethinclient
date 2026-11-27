@@ -116,7 +116,7 @@ class FleetTests(unittest.TestCase):
         fleet.save_group(self.store,{'id':self.group,'shortcuts':[item],'show_shutdown':True,'browser_title':'Internet'})
         fleet.save_group(self.store,{'id':self.group,'description':'Nova descrição'})
         profile=next(group for group in fleet.groups(self.store) if group['id']==self.group)
-        self.assertEqual(profile['shortcuts'],[item]);self.assertTrue(profile['show_shutdown'])
+        self.assertEqual(profile['shortcuts'],[{**item,'window_mode':'inherit','arguments':'','autostart':False}]);self.assertTrue(profile['show_shutdown'])
         self.assertEqual(profile['browser_title'],'Internet')
         for changes in ({'url':'javascript:alert(1)'},{'url':'https://user:pass@portal.example'},{'name':'bad\nname'},
                         {'id':'../evil'},{'icon':'../../etc/passwd'},{'enabled':'false'}):
@@ -136,6 +136,18 @@ class FleetTests(unittest.TestCase):
 
 
 class FleetApiTests(test_core.PanelTests):
+    def test_network_page_script_and_group_settings_are_served(self):
+        import urllib.request
+        with urllib.request.urlopen(self.url+'/network.js') as response:
+            self.assertEqual(response.status,200)
+            self.assertIn(b'initializeNetworkUI',response.read())
+        self.login()
+        code,group=self.request('/api/groups/save',{'name':'DNS lab','dns_override':True,'dns_servers':'10.0.0.10','dns_search':'example.test'})
+        self.assertEqual(code,200)
+        saved=self.request('/api/fleet')[1]['groups'][0]
+        self.assertEqual(saved['dns_servers'],['10.0.0.10'])
+        self.assertEqual(self.request('/api/groups/save',{'id':group['id'],'dns_servers':'dhcp'})[0],400)
+
     def test_client_token_cannot_read_admin_state_or_change_group(self):
         code, client = self.request('/api/client/enroll', {'mac':'02:00:00:00:00:02', 'name':'pc-02'})
         self.assertEqual(code,201)

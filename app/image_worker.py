@@ -80,7 +80,7 @@ def activate(target, origin, previous):
         if not (target/name).is_file() or (target/name).is_symlink():
             raise ValueError('Release de imagem incompleta')
     script='#!ipxe\n# iPXE project: https://ipxe.org\n# previous-image: '+previous+'\ndhcp\nset base '+origin+'/releases/'+target.name+'''
-kernel ${base}/vmlinuz initrd=initrd.magic boot=live quiet loglevel=3 components username=thinclient hostname=freethinclient locales=pt_BR.UTF-8 keyboard-layouts=br timezone=America/Sao_Paulo ip=dhcp fetch=${base}/filesystem.squashfs nopersistence
+kernel ${base}/vmlinuz initrd=initrd.magic boot=live quiet loglevel=3 components username=thinclient hostname=freethinclient locales=pt_BR.UTF-8 keyboard-layouts=br timezone=America/Sao_Paulo fetch=${base}/filesystem.squashfs nopersistence
 initrd ${base}/initrd.img
 boot
 '''
@@ -167,8 +167,12 @@ def cleanup_staging():
 def missing_client_packages(root):
     required=[('polkitd','usr/lib/polkit-1/polkitd'),
               ('libglib2.0-bin','usr/bin/gio'),('xdg-user-dirs','usr/bin/xdg-user-dir'),
-              ('gvfs-daemons','usr/libexec/gvfsd-metadata')]
-    return [package for package,binary in required if not (root/binary).is_file()]
+              ('gvfs-daemons','usr/libexec/gvfsd-metadata'),
+              ('network-manager','usr/bin/nmcli'),('network-manager','usr/bin/nmtui'),
+              ('network-manager-gnome','usr/bin/nm-connection-editor'),
+              ('wpasupplicant','sbin/wpa_supplicant'),('wireless-regdb','lib/firmware/regulatory.db'),
+              ('rfkill','usr/sbin/rfkill')]
+    return list(dict.fromkeys(package for package,binary in required if not (root/binary).is_file()))
 
 
 def chroot_update(root, action, package=None):
@@ -264,20 +268,24 @@ def perform(job, progress, log):
         if job['action']=='client':
             client_lib=staged/'usr/local/lib/freethinclient';client_lib.mkdir(parents=True,exist_ok=True)
             assets=staged/'usr/share/freethinclient';assets.mkdir(parents=True,exist_ok=True)
-            for name in ('agent.py','session.py','device_info.py'):
+            (staged/'etc/NetworkManager/conf.d').mkdir(parents=True,exist_ok=True)
+            units=staged/'etc/systemd/system';units.mkdir(parents=True,exist_ok=True)
+            shutil.copyfile(BASE/'client/freethinclient-client.service',units/'freethinclient-client.service')
+            for name in ('agent.py','session.py','device_info.py','launch_options.py','network.py','dns_config.py'):
                 shutil.copyfile(BASE/'client'/name,client_lib/name)
             autostart=staged/'etc/xdg/autostart';autostart.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(BASE/'client/freethinclient-info.desktop',autostart/'freethinclient-info.desktop')
             policy=staged/'etc/polkit-1/rules.d/49-freethinclient-power.rules'
             policy.parent.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(BASE/'client/power.rules',policy)
+            shutil.copyfile(BASE/'client/network.rules',policy.parent/'10-freethinclient-network.rules')
             shutil.copyfile(BASE/'client/kiosk.xml',assets/'kiosk.xml')
             shutil.copyfile(BASE/'client/boot-banner.txt',assets/'boot-banner.txt')
             for source,relative in [('initramfs-banner-hook','hooks'),('initramfs-banner','scripts/init-premount')]:
                 destination=staged/'etc/initramfs-tools'/relative/'freethinclient-banner'
                 destination.parent.mkdir(parents=True,exist_ok=True)
                 shutil.copyfile(BASE/'client'/source,destination);destination.chmod(0o755)
-            for name in ('blue-workspace','browser','remote','citrix','shutdown','restart'):
+            for name in ('blue-workspace','browser','remote','citrix','shutdown','restart','network'):
                 run_command(['rsvg-convert','-o',str(assets/(name+'.png')),str(BASE/'web/assets'/(name+'.svg'))],log)
         args=['unshare','--mount','--fork','--kill-child','--propagation','private',sys.executable,'-B','-m','app.image_worker',
               '--chroot',str(staged),'--action',job['action']]

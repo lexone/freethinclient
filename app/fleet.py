@@ -6,6 +6,8 @@ import re
 import secrets
 import time
 from urllib.parse import urlsplit
+from client.launch_options import arguments, WINDOW_MODES
+from client.dns_config import servers as dns_servers, domains as dns_domains
 
 MODES = ('desktop', 'browser', 'kiosk', 'citrix', 'rdp')
 BOOT_TYPES = ('pxe', 'local')
@@ -52,15 +54,28 @@ def validate_group(data):
         raise ValueError('Informe a URL do navegador')
     if target == 'citrix' and not result['citrix_url']:
         raise ValueError('Informe o portal Citrix')
-    if target == 'rdp' and not result['rdp_host']:
+    if target == 'rdp' and not result['rdp_host'] and not data.get('rdp_prompt_server',False):
         raise ValueError('Informe o destino RDP')
     for key, default in (('lock_wallpaper', True), ('allow_usb', False), ('reconnect', True), ('mac_reenroll', False),
                          ('show_browser', True), ('show_rdp', True), ('show_citrix', True),
                          ('show_system_icons', False), ('show_panel', True), ('fullscreen', False),
+                         ('dns_override', False), ('allow_network_settings', False), ('rdp_prompt_server', False),
+                         ('browser_autostart', False), ('citrix_autostart', False), ('rdp_autostart', False),
                          ('show_shutdown', False), ('show_restart', False), ('confirm_power', True), ('show_device_info', True)):
         if type(data.get(key, default)) is not bool:
             raise ValueError('Opção inválida: ' + key)
         result[key] = data.get(key, default)
+    result['dns_servers']=dns_servers(data.get('dns_servers',[]))
+    result['dns_search']=dns_domains(data.get('dns_search',[]))
+    if result['dns_override'] and not result['dns_servers']: raise ValueError('Informe pelo menos um servidor DNS')
+    for app in ('browser','citrix','rdp'):
+        key=app+'_window_mode'; result[key]=data.get(key,'inherit')
+        if result[key] not in WINDOW_MODES: raise ValueError('Modo de abertura inválido: '+app)
+        key=app+'_arguments'; result[key]=text(data.get(key,''),1024)
+        arguments(result[key],app)
+        if result[app+'_autostart']:
+            if app=='citrix' and not result['citrix_url']: raise ValueError('Informe o portal Citrix para iniciar automaticamente')
+            if app=='rdp' and not result['rdp_host'] and not result['rdp_prompt_server']: raise ValueError('Informe o destino RDP ou habilite a pergunta ao conectar')
     for key,default in (('browser_title','Navegador'),('rdp_title','Área remota'),('citrix_title','Citrix')):
         result[key]=text(data.get(key,default),80)
         if not result[key]: raise ValueError('Informe o nome do atalho')
@@ -78,8 +93,12 @@ def validate_group(data):
             raise ValueError('Identificador, nome, ícone ou estado do atalho inválido')
         if url.scheme!='https' or not url.hostname or url.username or url.password or any(c in address for c in ('\\','"')):
             raise ValueError('O endereço do atalho deve usar HTTPS sem credenciais')
+        opening=item.get('window_mode','inherit'); automatic=item.get('autostart',False)
+        params=text(item.get('arguments',''),1024)
+        if opening not in WINDOW_MODES or type(automatic) is not bool: raise ValueError('Inicialização do atalho inválida')
+        arguments(params,'browser')
         seen.add(identity)
-        result['shortcuts'].append({'id':identity,'name':title,'url':address,'icon':icon,'enabled':enabled})
+        result['shortcuts'].append({'id':identity,'name':title,'url':address,'icon':icon,'enabled':enabled,'window_mode':opening,'arguments':params,'autostart':automatic})
     return result
 
 
@@ -95,6 +114,8 @@ def initialize(store):
             group_id TEXT REFERENCES fleet_groups(id), last_seen INTEGER,
             ip TEXT, firmware TEXT, command TEXT, command_id TEXT, last_ack TEXT);
         ''')
+        if 'dns_status' not in {row[1] for row in db.execute('PRAGMA table_info(fleet_devices)')}:
+            db.execute("ALTER TABLE fleet_devices ADD COLUMN dns_status TEXT NOT NULL DEFAULT '{}'")
 
 
 def groups(store):
@@ -135,10 +156,12 @@ def delete_group(store, identity, actor='admin'):
 
 def devices(store):
     with store.connect() as db:
-        rows = db.execute('''SELECT id,mac,name,approved,group_id,last_seen,ip,firmware,command,command_id,last_ack
+        rows = db.execute('''SELECT id,mac,name,approved,group_id,last_seen,ip,firmware,command,command_id,last_ack,dns_status
                              FROM fleet_devices ORDER BY name''').fetchall()
-    keys = ('id', 'mac', 'name', 'approved', 'group_id', 'last_seen', 'ip', 'firmware', 'command', 'command_id', 'last_ack')
-    return [dict(zip(keys, row), online=bool(row[5] and row[5] > time.time() - 90)) for row in rows]
+    keys = ('id', 'mac', 'name', 'approved', 'group_id', 'last_seen', 'ip', 'firmware', 'command', 'command_id', 'last_ack', 'dns_status')
+    result=[dict(zip(keys,row),online=bool(row[5] and row[5]>time.time()-90)) for row in rows]
+    for item in result: item['dns_status']=json.loads(item['dns_status'])
+    return result
 
 
 def enroll(store, data):
@@ -216,6 +239,14 @@ def heartbeat(store, identity, data):
     ip = text(data.get('ip', ''), 50)
     if ip:
         ipaddress.ip_address(ip)
+    report=data.get('dns_status')
+    if report is not None:
+        if not isinstance(report,dict): raise ValueError('Estado DNS inválido')
+        if report:
+            state=report.get('state')
+            if state not in ('applied','dhcp','error'): raise ValueError('Estado DNS inválido')
+            report={'state':state,'message':text(report.get('message',''),300),'timestamp':int(time.time())}
+        report=json.dumps(report)
     with store.connect() as db:
         row = db.execute('SELECT approved,group_id,command,command_id,firmware,name FROM fleet_devices WHERE id=?', (identity,)).fetchone()
         if not row:
@@ -225,6 +256,7 @@ def heartbeat(store, identity, data):
             db.execute('UPDATE fleet_devices SET command=NULL,command_id=NULL,last_ack=? WHERE id=?', (command_id, identity))
             action = command_id = None
         db.execute("UPDATE fleet_devices SET last_seen=?,ip=CASE WHEN ?='' THEN ip ELSE ? END WHERE id=?", (int(time.time()), ip, ip, identity))
+        if report is not None: db.execute('UPDATE fleet_devices SET dns_status=? WHERE id=?',(report,identity))
         group = db.execute('SELECT profile,revision FROM fleet_groups WHERE id=?', (group_id,)).fetchone() if approved else None
     result = {'approved': bool(approved and group), 'command': action, 'command_id': command_id}
     if group:

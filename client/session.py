@@ -10,6 +10,10 @@ import signal
 import subprocess
 import time
 from pathlib import Path
+try:
+    from client.launch_options import arguments, window_mode, rdp_host
+except ModuleNotFoundError:
+    from launch_options import arguments, window_mode, rdp_host
 
 PROFILE = Path('/var/lib/freethinclient-client/profile.json')
 ASSETS = Path('/usr/share/freethinclient')
@@ -40,61 +44,88 @@ def desktop_file(name, title, icon, action):
 
 
 def application(profile, mode):
+    launcher=mode
+    shortcut_args=''
     if mode.startswith('shortcut:'):
         if profile.get('mode')=='kiosk': return None
         identity=mode.removeprefix('shortcut:')
         item=next((item for item in profile.get('shortcuts',[]) if item.get('id')==identity and item.get('enabled',True)),None)
-        if not item: return None
-        profile={**profile,'homepage':item['url']}
+        if not item or not re.fullmatch('[a-f0-9]{12}',identity): return None
+        shortcut_args=item.get('arguments','')
+        opening=item.get('window_mode','inherit')
+        profile={**profile,'homepage':item['url'],
+                 'browser_window_mode':profile.get('browser_window_mode','inherit') if opening=='inherit' else opening}
         mode='browser'
-    kiosk = mode == 'kiosk'
-    if kiosk:
-        mode = profile.get('kiosk_app', 'browser')
-    browser = shutil.which('google-chrome') or shutil.which('chromium')
-    if mode in ('browser', 'kiosk', 'citrix'):
-        if not browser:
-            return None
-        url = profile.get('citrix_url') if mode == 'citrix' else profile.get('homepage')
-        if not url:
-            return None
-        # ICA downloads open through the Citrix package's MIME handler when installed.
-        args = [browser, '--no-first-run', '--disable-session-crashed-bubble']
-        args += ['--user-data-dir=' + str(HOME / '.config' / 'freethinclient-browser')]
-        if kiosk:
-            args += ['--kiosk', '--incognito']
-        elif profile.get('fullscreen'):
-            args += ['--start-fullscreen']
-        return args + [url]
-    if mode == 'rdp' and profile.get('rdp_host'):
-        args = ['xfreerdp', '/v:' + profile['rdp_host'], '/f', '/dynamic-resolution', '/sound', '/microphone', '/cert:deny']
-        if profile.get('rdp_domain'):
-            args += ['/d:' + profile['rdp_domain']]
-        # Password is prompted by FreeRDP; certificate validation remains enabled.
-        return args
+    kiosk=mode=='kiosk'
+    if kiosk: mode=profile.get('kiosk_app','browser')
+    try:
+        opening='kiosk' if kiosk else window_mode(profile,mode)
+        extra=arguments(profile.get(mode+'_arguments',''),mode)
+        if launcher.startswith('shortcut:'): extra+=arguments(shortcut_args,'browser')
+    except ValueError as error:
+        logging.warning('Configuração de aplicativo inválida: %s',error)
+        return None
+    browser=shutil.which('google-chrome') or shutil.which('chromium')
+    if mode in ('browser','citrix'):
+        url=profile.get('citrix_url') if mode=='citrix' else profile.get('homepage')
+        if not browser or not url: return None
+        # Each launcher owns a browser profile so an existing Chrome process cannot
+        # silently discard different fullscreen/kiosk flags from another launcher.
+        key=launcher.replace(':','-') if launcher.startswith('shortcut:') else mode
+        args=[browser,'--no-first-run','--disable-session-crashed-bubble',
+              '--user-data-dir='+str(HOME/'.config'/('freethinclient-'+key))]
+        if opening=='kiosk': args+=['--kiosk','--incognito']
+        elif opening=='fullscreen': args+=['--start-fullscreen']
+        return args+extra+[url]
+    if mode=='rdp' and rdp_host(profile.get('rdp_host','')):
+        args=['xfreerdp','/v:'+profile['rdp_host'],'/dynamic-resolution','/sound','/microphone','/cert:deny']
+        if opening in ('fullscreen','kiosk'): args+=['/f']
+        if profile.get('rdp_domain'): args+=['/d:'+profile['rdp_domain']]
+        return args+extra
     return None
 
 
 def launch(profile, mode):
     if mode in ('shutdown','restart'):
-        power_action(profile,mode)
+        power_action(profile,mode);return None
+    if mode=='network':
+        if profile.get('approved') and profile.get('allow_network_settings'):
+            return subprocess.Popen(['/usr/bin/python3','/usr/local/lib/freethinclient/network.py'],start_new_session=True)
         return None
-    args = application(profile, mode)
-    if not args:
-        return None
-    if mode == 'rdp' or (mode == 'kiosk' and profile.get('kiosk_app') == 'rdp'):
-        dialog = subprocess.run(['zenity', '--forms', '--title=Conectar à área remota', '--text=Entre com sua conta Windows',
-                       '--add-entry=Usuário', '--add-password=Senha', '--separator=\n'], capture_output=True, check=False)
-        if dialog.returncode:
-            return None
-        fields = dialog.stdout.decode().rstrip('\n').split('\n')
-        if len(fields) != 2 or not fields[0]:
-            return None
-        args += ['/u:' + fields[0], '/from-stdin:force']
-        child = subprocess.Popen(args, stdin=subprocess.PIPE, start_new_session=True)
-        child.stdin.write((fields[1] + '\n').encode())
-        child.stdin.close()
+    is_rdp=mode=='rdp' or (mode=='kiosk' and profile.get('kiosk_app')=='rdp')
+    if is_rdp:
+        prompt_server=profile.get('rdp_prompt_server',False)
+        if not prompt_server and not rdp_host(profile.get('rdp_host','')): return None
+        fields=['--add-entry=Servidor RDP'] if prompt_server else []
+        dialog=subprocess.run(['zenity','--forms','--title=Conectar à área remota (RDP)',
+            '--text=Entre com sua conta Windows',*fields,'--add-entry=Usuário','--add-password=Senha','--separator=\n'],
+            capture_output=True,check=False)
+        if dialog.returncode: return None
+        values=dialog.stdout.decode().rstrip('\n').split('\n')
+        if len(values)!=(3 if prompt_server else 2): return None
+        if prompt_server:
+            host=values.pop(0).strip()
+            if not rdp_host(host):
+                call(['zenity','--error','--text=Informe um nome ou IP válido para o servidor RDP.']);return None
+            profile={**profile,'rdp_host':host}
+        if not values[0]: return None
+        args=application(profile,mode)
+        if not args: return None
+        args+=['/u:'+values[0],'/from-stdin:force']
+        child=subprocess.Popen(args,stdin=subprocess.PIPE,start_new_session=True)
+        child.stdin.write((values[1]+'\n').encode());child.stdin.close()
         return child
-    return subprocess.Popen(args, start_new_session=True)
+    args=application(profile,mode)
+    return subprocess.Popen(args,start_new_session=True) if args else None
+
+
+def startup_applications(profile):
+    mode=profile.get('mode','desktop')
+    if mode!='desktop': return [mode]
+    targets=[app for app in ('browser','citrix','rdp') if profile.get(app+'_autostart',False)]
+    targets += ['shortcut:'+item['id'] for item in profile.get('shortcuts',[])
+                if item.get('autostart',False) and item.get('enabled',True)]
+    return targets
 
 
 def power_action(profile, action):
@@ -162,7 +193,8 @@ def stop_component(name):
     return False
 
 
-def apply_panel():
+def apply_panel(profile=None):
+    profile=profile or {}
     # One full-width bottom bar instead of the default top panel and launcher dock.
     xfconf('xfce4-panel','/configver',2,'int')
     xfconf_array('xfce4-panel', '/panels', [1])
@@ -170,7 +202,8 @@ def apply_panel():
                               ('length', 100, 'uint'), ('length-adjust', 'false', 'bool'),
                               ('position-locked', 'true', 'bool')]:
         xfconf('xfce4-panel', '/panels/panel-1/' + prop, value, kind)
-    xfconf_array('xfce4-panel', '/panels/panel-1/plugin-ids', [101, 102, 103])
+    xfconf_array('xfce4-panel', '/panels/panel-1/plugin-ids', [101, 102, 104, 103] if profile.get('allow_network_settings') else [101, 102, 103])
+    xfconf('xfce4-panel','/plugins/plugin-104','systray')
     for plugin, name in [(101, 'tasklist'), (102, 'separator'), (103, 'clock')]:
         xfconf('xfce4-panel', '/plugins/plugin-' + str(plugin), name)
     xfconf('xfce4-panel', '/plugins/plugin-102/expand', 'true', 'bool')
@@ -205,8 +238,9 @@ def apply_desktop(profile):
     xfconf('thunar-volman', '/automount-media/enabled', str(profile.get('allow_usb', False)).lower(), 'bool')
     for name, title, icon, mode, enabled in (
             ('browser', profile.get('browser_title','Navegador'), 'browser.png', 'browser', profile.get('show_browser', True)),
-            ('remote', profile.get('rdp_title','Área remota'), 'remote.png', 'rdp', profile.get('show_rdp', True) and profile.get('rdp_host')),
+            ('remote', profile.get('rdp_title','Área remota'), 'remote.png', 'rdp', profile.get('show_rdp', True) and (profile.get('rdp_host') or profile.get('rdp_prompt_server'))),
             ('citrix', profile.get('citrix_title','Citrix'), 'citrix.png', 'citrix', profile.get('show_citrix', True) and profile.get('citrix_url')),
+            ('network','Rede e Wi-Fi','network.png','network',profile.get('approved') and profile.get('allow_network_settings',False)),
             ('shutdown','Desligar','shutdown.png','shutdown',profile.get('show_shutdown',False)),
             ('restart','Reiniciar','restart.png','restart',profile.get('show_restart',False))):
         if enabled and profile.get('mode') != 'kiosk':
@@ -223,7 +257,7 @@ def apply_desktop(profile):
     for directory in {desktop_directory(),HOME/'Desktop'}:
         for file in directory.glob('ftc-web-*.desktop'):
             if file.name not in active: file.unlink(missing_ok=True)
-    apply_panel()
+    apply_panel(profile)
     return True
 
 
@@ -236,6 +270,11 @@ def stop_child(child):
 
 
 def session_shell(profile):
+    if profile.get('approved') and profile.get('allow_network_settings') and profile.get('mode')!='kiosk':
+        if call(['pgrep','-u',str(os.getuid()),'-x','nm-applet']).returncode:
+            subprocess.Popen(['nm-applet','--sm-disable'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+    else:
+        call(['pkill','-u',str(os.getuid()),'-x','nm-applet'])
     if profile.get('mode') == 'kiosk':
         call(['xfce4-panel', '--quit'])
         call(['pkill', '-u', str(os.getuid()), '-x', 'xfdesktop'])
@@ -269,13 +308,14 @@ def main():
             if child:
                 child.wait()
         return
-    child, previous, mode = None, '', ''
+    children, previous, mode = {}, '', ''
     waiting = None
     pending_initialized=False
     while True:
         profile = read_profile()
         if not profile.get('approved'):
-            stop_child(child)
+            for child in children.values(): stop_child(child)
+            children={}
             previous = ''
             if not pending_initialized:
                 pending_initialized=apply_desktop({})
@@ -290,16 +330,18 @@ def main():
         pending_initialized=False
         revision = profile.get('revision', '')
         if revision != previous:
-            stop_child(child)
+            for child in children.values(): stop_child(child)
+            children={}
             # The root agent never accepts arbitrary shell commands.
             mode = profile.get('mode', 'desktop')
             if apply_desktop(profile):
                 session_shell(profile)
                 previous = revision
-                child = launch(profile, mode)
-        elif child and child.poll() is not None and profile.get('reconnect'):
-            time.sleep(3)
-            child = launch(profile, mode)
+                children={target:launch(profile,target) for target in startup_applications(profile)}
+        elif profile.get('reconnect'):
+            for target,child in list(children.items()):
+                if child and child.poll() is not None:
+                    children[target]=launch(profile,target)
         if profile.get('lock_wallpaper') and mode != 'kiosk':
             apply_wallpaper(profile)
         time.sleep(3)

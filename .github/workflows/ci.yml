@@ -16,7 +16,9 @@ jobs:
           node --check web/fleet.js
           node --check web/images.js
           node --check web/shortcuts.js
+          node --check web/network.js
           node tests/ui-monitor.cjs
+          node tests/ui-network.cjs
           for script in scripts/*.sh; do bash -n "$script"; done
           python3 -m compileall -q app scripts client
       - name: Device information widget on a disposable display
@@ -24,6 +26,7 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y python3-gi gir1.2-gtk-3.0 xvfb xauth
           timeout 15s xvfb-run -a python3 tests/smoke_device_info.py
+          timeout 15s xvfb-run -a python3 tests/smoke_network.py
       - name: Real Xfce desktop and panel on a disposable display
         run: |
           sudo apt-get install -y xfdesktop4 xfce4-panel xfwm4 xfconf dbus-x11 libglib2.0-bin gvfs xdg-user-dirs librsvg2-bin
@@ -47,6 +50,8 @@ jobs:
           docker exec ftc-smoke python3 -c 'import json,urllib.request; assert json.load(urllib.request.urlopen("http://127.0.0.1:8080/healthz"))["status"] == "ok"'
           docker exec ftc-smoke systemctl is-active freethinclient freethinclient-update.timer freethinclient-image.timer nginx
           docker exec ftc-smoke python3 /source/tests/smoke_image_portal.py --service
+          docker exec ftc-smoke apt-get install -y network-manager
+          docker exec ftc-smoke python3 /source/tests/smoke_dns.py
           docker exec -e FTC_DISPOSABLE_TEST=1 ftc-smoke python3 /source/tests/smoke_update.py
       - name: Smoke test diagnostics
         if: failure()

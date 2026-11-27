@@ -20,6 +20,11 @@ device_info = module('device_info')
 
 
 class ClientTests(unittest.TestCase):
+    def setUp(self):
+        for name,value in [('apply',{}),('status',{})]:
+            patcher=patch.object(agent.dns_config,name,return_value=value)
+            patcher.start();self.addCleanup(patcher.stop)
+
     def test_agent_preserves_identity_and_never_runs_arbitrary_commands(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
