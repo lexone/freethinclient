@@ -81,3 +81,16 @@ jobs:
           test -f /var/tmp/ftc-client-config/builder-root/work/config/hooks/live/0900-freethinclient.hook.chroot
           test -x /var/tmp/ftc-client-config/builder-root/work/config/includes.chroot/etc/initramfs-tools/hooks/freethinclient-banner
           test -f /var/tmp/ftc-client-config/builder-root/work/config/includes.chroot/usr/share/freethinclient/boot-banner.txt
+
+  browser-console:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      - name: Render actual noVNC pixels in Chrome
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y x11vnc xvfb xauth x11-xserver-utils
+          python3 -m pip install --target "$RUNNER_TEMP/browser-deps" websocket-client==1.8.0
+          PYTHONPATH="$RUNNER_TEMP/browser-deps" python3 tests/smoke_browser_console.py
+          sudo env GITHUB_ACTIONS=true PYTHONPATH="$RUNNER_TEMP/browser-deps" python3 tests/smoke_browser_console.py --real-vnc --chrome "$(command -v google-chrome)"
