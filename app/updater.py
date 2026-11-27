@@ -46,7 +46,20 @@ def atomic_json(path, value, mode=0o644):
 
 
 def status(state, **fields):
-    atomic_json(STATUS, {"state": state, "timestamp": int(time.time()), **fields})
+    labels = {'checking':'Consultando o GitHub e verificando a assinatura',
+              'available':'Nova versão assinada disponível','current':'Versão instalada já está atualizada',
+              'downloading':'Baixando o pacote assinado','verifying':'Conferindo tamanho e SHA-256 do pacote',
+              'extracting':'Extraindo arquivos e validando o código Python',
+              'backup':'Preparando o backup do banco e das configurações',
+              'applying':'Backup concluído. Ativando a nova versão e reiniciando o painel',
+              'health':'Validando a saúde do painel atualizado',
+              'updated':'Atualização concluída. Painel validado e backup preservado',
+              'rolled_back':'Versão anterior restaurada após falha', 'error':'Falha na atualização'}
+    previous = json.loads(STATUS.read_text()) if STATUS.exists() and state != 'checking' else {}
+    history = previous.get('log', [])[-79:]
+    message = fields.get('message') or labels.get(state, state)
+    history.append(time.strftime('%d/%m/%Y %H:%M:%S')+' · '+message)
+    atomic_json(STATUS, {"state": state, "timestamp": int(time.time()), "log":history, **fields})
 
 
 def systemctl(action):
@@ -160,8 +173,10 @@ def apply_update(manifest, download):
         status("downloading", target=manifest["version"])
         package = staging / "package.tar.gz"
         package.write_bytes(download(manifest["asset"], MAX_PACKAGE))
+        status("verifying", target=manifest["version"])
         validate_package(package, manifest)
         extracted = staging / "release"
+        status("extracting", target=manifest["version"])
         extract_package(package, extracted, manifest["version"])
         subprocess.run(["python3", "-m", "compileall", "-q", str(extracted / "app")], check=True, timeout=30,
                        env={**os.environ, "PYTHONPYCACHEPREFIX": str(staging / "bytecode")})
@@ -171,7 +186,7 @@ def apply_update(manifest, download):
         shutil.move(str(extracted), dest)
     backup = BACKUPS / (time.strftime("%Y%m%d-%H%M%S") + "-" + manifest["version"])
     backup.mkdir(parents=True, mode=0o700)
-    status("applying", target=manifest["version"])
+    status("backup", target=manifest["version"])
     systemctl("stop")
     try:
         with closing(sqlite3.connect(STATE / "state.db")) as source, closing(sqlite3.connect(backup / "state.db")) as target:
@@ -180,8 +195,10 @@ def apply_update(manifest, download):
             if file.exists():
                 shutil.copy2(file, backup / file.name)
         atomic_json(PENDING, {"previous": str(previous), "backup": str(backup)}, 0o600)
+        status("applying", target=manifest["version"])
         switch(dest)
         systemctl("start")
+        status("health", target=manifest["version"])
         if not healthy(manifest["version"]):
             raise RuntimeError("Nova versão não passou no teste de saúde")
         PENDING.unlink()

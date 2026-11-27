@@ -17,7 +17,7 @@ unsquashfs -d "$WORK/root" "$BOOT/filesystem.squashfs"
 ROOT="$WORK/root"
 [[ -f "$ROOT/etc/debian_version" && -d "$ROOT/usr/local/lib/freethinclient" ]] || { echo 'Não é uma imagem cliente FreeThinClient.' >&2; exit 1; }
 [[ ! -f "$ROOT/var/lib/freethinclient-client/identity.json" ]] || { echo 'A imagem contém identidade de um cliente. Use uma imagem limpa.' >&2; exit 1; }
-install -m 0644 "$SOURCE/client/session.py" "$SOURCE/client/agent.py" "$SOURCE/client/device_info.py" "$SOURCE/client/launch_options.py" "$SOURCE/client/network.py" "$SOURCE/client/dns_config.py" "$ROOT/usr/local/lib/freethinclient/"
+install -m 0644 "$SOURCE/client/session.py" "$SOURCE/client/agent.py" "$SOURCE/client/device_info.py" "$SOURCE/client/launch_options.py" "$SOURCE/client/network.py" "$SOURCE/client/dns_config.py" "$SOURCE/client/remote.py" "$ROOT/usr/local/lib/freethinclient/"
 install -d -m 0755 "$ROOT/usr/share/freethinclient" "$ROOT/etc/xdg/autostart"
 install -d "$ROOT/etc/polkit-1/rules.d" "$ROOT/etc/NetworkManager/conf.d"
 install -m 0644 "$SOURCE/client/power.rules" "$ROOT/etc/polkit-1/rules.d/49-freethinclient-power.rules"

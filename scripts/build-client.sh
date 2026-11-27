@@ -57,6 +57,7 @@ python3
 python3-gi
 gir1.2-gtk-3.0
 zenity
+x11vnc
 network-manager
 network-manager-gnome
 wpasupplicant
@@ -79,7 +80,7 @@ install -d "$ROOT/usr/local/lib/freethinclient" "$ROOT/usr/share/freethinclient"
   "$ROOT/etc/freethinclient-client" "$ROOT/etc/xdg/autostart" "$ROOT/etc/lightdm/lightdm.conf.d" \
   "$ROOT/etc/systemd/system/multi-user.target.wants" "$ROOT/var/lib/freethinclient-client" \
   "$ROOT/etc/skel/.config/xfce4/xfconf/xfce-perchannel-xml"
-install -m 0644 "$SOURCE/client/agent.py" "$SOURCE/client/session.py" "$SOURCE/client/device_info.py" "$SOURCE/client/launch_options.py" "$SOURCE/client/network.py" "$SOURCE/client/dns_config.py" "$ROOT/usr/local/lib/freethinclient/"
+install -m 0644 "$SOURCE/client/agent.py" "$SOURCE/client/session.py" "$SOURCE/client/device_info.py" "$SOURCE/client/launch_options.py" "$SOURCE/client/network.py" "$SOURCE/client/dns_config.py" "$SOURCE/client/remote.py" "$ROOT/usr/local/lib/freethinclient/"
 install -m 0644 "$SOURCE/web/assets/"*.svg "$ROOT/usr/share/freethinclient/"
 for name in blue-workspace browser remote citrix shutdown restart network; do
   rsvg-convert -o "$ROOT/usr/share/freethinclient/$name.png" "$SOURCE/web/assets/$name.svg"

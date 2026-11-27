@@ -1,5 +1,6 @@
 'use strict';
 let auditEvents = [];
+let remoteAdmin = false;
 let refreshInFlight = null;
 let csrf = '', availableVersion = '', authenticated = false, lastUpdate = '';
 const $ = id => document.getElementById(id);
@@ -17,13 +18,22 @@ async function api(path, data) {
     throw error;
   } finally {clearTimeout(timeout);}
 }
-function showLogin() { authenticated = false; $('dashboard').hidden = true; $('logout').hidden = true; $('login').hidden = false; route(); }
+globalThis.remoteApi = (path,data)=>api(path,data);
+function showLogin() { if($('remote-dialog')?.open)$('remote-dialog').close(); authenticated = false; $('dashboard').hidden = true; $('logout').hidden = true; $('login').hidden = false; route(); }
 function renderUpdate(update) {
   const labels = {idle:'Nenhuma consulta realizada.', checking:'Consultando e verificando a assinatura…', available:'Nova versão assinada disponível', current:'Você já está na versão disponível ou em uma versão superior.', downloading:'Baixando e validando o pacote…', applying:'Aplicando atualização. O painel pode ficar indisponível por alguns segundos.', updated:'Atualização concluída e serviço validado.', rolled_back:'A atualização falhou. A versão anterior foi restaurada.', error:'Não foi possível concluir a atualização.'};
+  const steps={idle:0,queued:0,checking:1,available:2,current:2,downloading:3,verifying:4,extracting:5,backup:6,applying:7,health:8,updated:9,rolled_back:9,error:0};
+  const title=update.message||labels[update.state]||update.state;
+  $('update-job-title').textContent=title;
+  const progress=$('update-progress');
+  if(['queued','checking'].includes(update.state))progress.removeAttribute('value');else progress.value=Math.round((steps[update.state]||0)/9*100);
+  $('update-step').textContent=update.timestamp?'Última informação: '+new Date(update.timestamp*1000).toLocaleString('pt-BR')+' · Progresso por etapas':'';
+  const log=$('update-log'),atBottom=log.scrollHeight-log.scrollTop-log.clientHeight<40;
+  log.textContent=(update.log||[]).join('\n')||'Aguardando uma nova consulta ou atualização.';if(atBottom)log.scrollTop=log.scrollHeight;
   $('update-status').textContent = [labels[update.state] || update.state, update.version ? `Versão: ${update.version}` : '', update.message || ''].filter(Boolean).join(' ');
   availableVersion = update.state === 'available' && update.signature_valid ? update.version : '';
   $('apply-update').disabled = !availableVersion;
-  $('check-update').disabled = ['checking','downloading','applying'].includes(update.state);
+  $('check-update').disabled = ['queued','checking','downloading','verifying','extracting','backup','applying','health'].includes(update.state);
 }
 function refresh(initial = false) {
   if (refreshInFlight) return refreshInFlight;
@@ -41,7 +51,7 @@ async function loadDashboard(initial) {
       if (state.wallpaper) { $('wallpaper-preview').src = '/api/wallpaper'; $('wallpaper-preview').hidden = false; $('wallpaper-empty').hidden = true; }
     }
     $('logout').textContent = 'Sair (' + state.user.username + ')';
-    const admin = state.user.role === 'admin';
+    const admin = state.user.role === 'admin';remoteAdmin=admin;
     $('image-manager').hidden = !admin;
     if(admin) renderImages(await api('/api/images'));
     $('tab-users').hidden = !admin; $('user-form').hidden = !admin;
@@ -56,12 +66,12 @@ async function loadDashboard(initial) {
     setFleetMonitor('ready');
   } catch (error) { setFleetMonitor('error', error.message); if (initial) showLogin(); }
 }
-$('login-form').addEventListener('submit', async event => {event.preventDefault(); try {const data = Object.fromEntries(new FormData(event.target));const result = await api('/api/login', data);csrf = result.csrf;event.target.elements.password.value = '';notify('');await refresh(true);} catch(error) {notify(error.message, true);} });
+$('login-form').addEventListener('submit', async event => {event.preventDefault(); try {const data = Object.fromEntries(new FormData(event.target));data.remember=event.target.elements.remember.checked;const result = await api('/api/login', data);csrf = result.csrf;event.target.elements.password.value = '';notify('');await refresh(true);} catch(error) {notify(error.message, true);} });
 $('logout').addEventListener('click', async () => {try {await api('/api/logout', {});showLogin();notify('Sessão encerrada.');}catch(error){notify(error.message,true);} });
 $('profile-form').addEventListener('submit', async event => {event.preventDefault(); const data = Object.fromEntries(new FormData(event.target));try {await api('/api/profile', data);notify('Identificação salva. Configure as conexões na aba Grupos e perfis.');await refresh();}catch(error){notify(error.message,true);} });
 $('wallpaper-file').addEventListener('change', async event => {const file = event.target.files[0];if (!file) return;if (file.size > 5 * 1024 * 1024) return notify('Escolha uma imagem de até 5 MB.',true);const reader = new FileReader();reader.onload = async () => {try {await api('/api/wallpaper', {data:String(reader.result).split(',')[1]});$('wallpaper-preview').src = '/api/wallpaper?t=' + Date.now();$('wallpaper-preview').hidden = false;$('wallpaper-empty').hidden = true;notify('Wallpaper salvo no servidor.');}catch(error){notify(error.message,true);}};reader.readAsDataURL(file);});
-$('check-update').addEventListener('click', async () => {try {await api('/api/update/check', {});$('check-update').disabled = true;notify('Consulta agendada. O serviço responde em até 15 segundos.');}catch(error){notify(error.message,true);} });
-$('apply-update').addEventListener('click', async () => {if (!availableVersion || !window.confirm(`Instalar a versão ${availableVersion}? Será feito backup e haverá uma breve interrupção do painel.`)) return;try {await api('/api/update/apply', {version:availableVersion});$('apply-update').disabled = true;notify('Atualização solicitada. Aguarde o resultado.');}catch(error){notify(error.message,true);} });
+$('check-update').addEventListener('click', async () => {try {await api('/api/update/check', {});$('check-update').disabled = true;renderUpdate({state:'queued',message:'Consulta na fila. Aguardando o serviço.'});notify('Consulta agendada. O serviço responde em até 15 segundos.');}catch(error){notify(error.message,true);} });
+$('apply-update').addEventListener('click', async () => {if (!availableVersion || !window.confirm(`Instalar a versão ${availableVersion}? Será feito backup e haverá uma breve interrupção do painel.`)) return;try {await api('/api/update/apply', {version:availableVersion});$('apply-update').disabled = true;renderUpdate({state:'queued',message:'Atualização na fila. Aguardando o serviço.'});notify('Atualização solicitada. Aguarde o resultado.');}catch(error){notify(error.message,true);} });
 initializeFleetUI();
 initializeUsersUI();
 initializeImagesUI();

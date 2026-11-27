@@ -12,9 +12,9 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 try:
-    from client import dns_config
+    from client import dns_config, remote
 except ModuleNotFoundError:
-    import dns_config
+    import dns_config, remote
 
 ROOT = Path('/var/lib/freethinclient-client')
 CONFIG = Path('/etc/freethinclient-client/config.json')
@@ -79,7 +79,8 @@ def tick(config):
     identity = json.loads(identity_path.read_text())
     ack_path = ROOT / 'ack'
     ack = ack_path.read_text().strip() if ack_path.exists() else ''
-    response = json.loads(request(config, '/api/client/heartbeat', {'ip': client_ip(), 'ack': ack, 'dns_status':dns_config.status()}, identity['token']))
+    response = json.loads(request(config, '/api/client/heartbeat', {'ip': client_ip(), 'ack': ack, 'dns_status':dns_config.status(), 'remote_support':1}, identity['token']))
+    remote.sync(config, identity['token'], response.get('remote') if response.get('approved') else None, request)
     if not response.get('approved'):
         atomic(ROOT / 'profile.json', json.dumps({'approved': False}).encode(), 0o644)
         dns_config.apply({'approved':False})

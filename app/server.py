@@ -15,7 +15,7 @@ from urllib.parse import urlsplit
 
 from app.security import password_ok, version_tuple
 from app.store import Store, audit_peer
-from app import fleet, users, images
+from app import fleet, users, images, remember, remote
 
 BASE = Path(__file__).resolve().parents[1]
 VERSION = (BASE / "VERSION").read_text().strip()
@@ -52,6 +52,8 @@ class ControlServer(ThreadingHTTPServer):
         self.store = Store(root)
         fleet.initialize(self.store)
         users.initialize(self.store, configuration["admin_hash"])
+        remember.initialize(self.store)
+        self.remote = remote.Relay(self.store)
         self.configuration = configuration
         self.sessions = {}
         self.attempts = {}
@@ -87,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
         except (KeyError, http.cookies.CookieError):
             return None
         with self.server.lock:
-            session = self.server.sessions.get(token)
+            session = self.server.sessions.get(token) or remember.load(self.server.store, token)
             if not session or session["expires"] < time.time():
                 self.server.sessions.pop(token, None)
                 return None
@@ -112,6 +114,14 @@ class Handler(BaseHTTPRequestHandler):
             with self.server.store.connect() as db:
                 db.execute("SELECT 1").fetchone()
             return self.reply(200, {"status": "ok", "version": VERSION, "state_schema": 1})
+        if path.startswith('/vendor/novnc/'):
+            name = path.removeprefix('/vendor/novnc/')
+            if not re.fullmatch(r'[A-Za-z0-9_./-]+', name) or '..' in name.split('/'):
+                return self.reply(404, {'error':'Não encontrado'})
+            file = BASE / 'web/vendor/novnc' / name
+            if file.suffix != '.js' or not file.is_file():
+                return self.reply(404, {'error':'Não encontrado'})
+            return self.reply(200, file.read_bytes(), mime='text/javascript')
         if path.startswith('/assets/'):
             name = path.removeprefix('/assets/')
             if not re.fullmatch(r'[a-z0-9-]+\.svg', name):
@@ -120,7 +130,7 @@ class Handler(BaseHTTPRequestHandler):
             if not file.is_file():
                 return self.reply(404, {'error': 'Não encontrado'})
             return self.reply(200, file.read_bytes(), mime='image/svg+xml')
-        if path in ("/", "/index.html", "/app.js", "/fleet.js", "/images.js", "/shortcuts.js", "/network.js", "/style.css", "/blue.css"):
+        if path in ("/", "/index.html", "/app.js", "/fleet.js", "/images.js", "/shortcuts.js", "/network.js", "/remote.js", "/remote-channel.js", "/style.css", "/blue.css"):
             file = BASE / "web" / ("index.html" if path == "/" else path[1:])
             mime = "text/html; charset=utf-8" if file.suffix == ".html" else "text/javascript" if file.suffix == ".js" else "text/css"
             return self.reply(200, file.read_bytes(), mime=mime)
@@ -139,6 +149,9 @@ class Handler(BaseHTTPRequestHandler):
             state = self.server.store
             status_path = Path(self.server.configuration["update_status"])
             update = json.loads(status_path.read_text()) if status_path.exists() else {"state": "idle"}
+            request_path = Path(self.server.configuration['update_request'])
+            if request_path.exists() and (not status_path.exists() or request_path.stat().st_mtime > status_path.stat().st_mtime):
+                update = dict(update, state='queued', message='Na fila. Aguardando o serviço de atualização.')
             return self.reply(200, {"version": VERSION, "csrf": session["csrf"],
                                    "user": {"username": session["username"], "role": session["role"]},
                                    "repository": self.server.configuration["repository"],
@@ -199,7 +212,15 @@ class Handler(BaseHTTPRequestHandler):
             if result.get('approved'):
                 meta = self.server.store.get('wallpaper')
                 result['wallpaper'] = meta
+                if 'dns_status' in data or 'remote_support' in data:
+                    result['remote'] = self.server.remote.pending(identity, data.get('remote_support') == 1)
             return self.reply(200, result)
+        if path == '/api/client/remote':
+            token = self.headers.get('Authorization', '').removeprefix('Bearer ')
+            identity = fleet.authenticate(self.server.store, token)
+            if not identity:
+                return self.reply(403, {'error':'Identidade do agente inválida'})
+            return self.reply(200, self.server.remote.exchange(data, device=identity))
         if path == '/api/client/wallpaper':
             token = self.headers.get('Authorization', '').removeprefix('Bearer ')
             identity = fleet.authenticate(self.server.store, token)
@@ -215,9 +236,16 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(403, {"error": "Sessão ou proteção CSRF inválida"})
         state = self.server.store
         actor = session['username']
-        if (path.startswith('/api/users/') or path.startswith('/api/update/') or path.startswith('/api/images/')) and session['role'] != 'admin':
+        if (path.startswith('/api/users/') or path.startswith('/api/update/') or path.startswith('/api/images/') or path.startswith('/api/remote/')) and session['role'] != 'admin':
             state.audit(actor, 'Acesso negado: ' + path)
             return self.reply(403, {'error': 'Esta ação exige um administrador'})
+        if path == '/api/remote/start':
+            return self.reply(201, self.server.remote.start(data.get('device'), actor, session['csrf'], data.get('control',False)))
+        if path == '/api/remote/poll':
+            return self.reply(200, self.server.remote.exchange(data, owner=session['csrf']))
+        if path == '/api/remote/stop':
+            self.server.remote.close(data.get('id'), session['csrf'])
+            return self.reply(200, {'ok':True})
         if path == '/api/images/jobs':
             try:
                 identity = images.enqueue(state, self.server.configuration, data, actor)
@@ -246,9 +274,11 @@ class Handler(BaseHTTPRequestHandler):
             return self.reply(200, {'ok': True})
         if path == "/api/logout":
             state.audit(actor, "Logout do painel")
+            self.server.remote.close_owner(session['csrf'])
             with self.server.lock:
                 token = http.cookies.SimpleCookie(self.headers.get("Cookie", ""))["session"].value
                 self.server.sessions.pop(token, None)
+                remember.revoke(state, token)
             return self.reply(200, {"ok": True}, cookie="session=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0")
         if path == "/api/profile":
             profile = validate_profile({**state.get('profile', {}), **data})
@@ -314,17 +344,22 @@ class Handler(BaseHTTPRequestHandler):
         if not account or not account['enabled'] or not valid:
             self.server.store.audit('anonymous', 'Tentativa de login recusada')
             return self.reply(401, {"error": "Usuário ou senha inválidos"})
+        if type(data.get('remember', False)) is not bool:
+            raise ValueError('Opção lembrar inválida')
+        lifetime = remember.TTL if data.get('remember') else 3600
         token, csrf = secrets.token_urlsafe(32), secrets.token_urlsafe(32)
         with self.server.lock:
             self.server.attempts.pop(peer, None)
             self.server.sessions = {k: v for k, v in self.server.sessions.items() if v["expires"] > now}
             if len(self.server.sessions) >= 100:
                 self.server.sessions.clear()
-            self.server.sessions[token] = {"csrf": csrf, "expires": now + 3600, "username": account["username"],
+            self.server.sessions[token] = {"csrf": csrf, "expires": now + lifetime, "username": account["username"],
                                            "role": account["role"], "revision": account["revision"]}
+        if data.get('remember'):
+            remember.save(self.server.store, token, self.server.sessions[token])
         secure = "; Secure" if self.server.configuration.get("secure_cookie", True) else ""
         self.server.store.audit(account["username"], "Login no painel")
-        return self.reply(200, {"ok": True, "csrf": csrf}, cookie=f"session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=3600{secure}")
+        return self.reply(200, {"ok": True, "csrf": csrf}, cookie=f"session={token}; Path=/; HttpOnly; SameSite=Strict; Max-Age={lifetime}{secure}")
 
 
 def main():

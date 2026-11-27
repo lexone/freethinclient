@@ -8,8 +8,9 @@ Restart=always
 RestartSec=10
 UMask=0077
 NoNewPrivileges=true
-PrivateTmp=true
-ProtectHome=true
+# On-demand x11vnc needs the existing X11 socket and read-only Xauthority.
+PrivateTmp=false
+ProtectHome=read-only
 ProtectSystem=strict
 ReadWritePaths=/var/lib/freethinclient-client /etc/NetworkManager/conf.d
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK

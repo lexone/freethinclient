@@ -1,5 +1,9 @@
 ## 0.2.1 - primeira release assinada para atualização remota
 
+## 0.2.2
+
+- Log e etapas do update remoto, login lembrado por 30 dias e console noVNC pelo HTTPS do agente.
+
 - Publicação de pacote, manifesto e assinatura RSA no GitHub, com validação do download e instalação via API do painel em servidor descartável.
 - Inicialização automática e parâmetros validados por aplicativo, modos janela/tela inteira/quiosque e RDP com destino fixo ou informado ao conectar.
 - Aba Rede e DNS, controle de permissões de rede/Wi-Fi e diagnóstico local de conectividade.

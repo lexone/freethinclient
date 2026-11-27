@@ -170,7 +170,7 @@ def missing_client_packages(root):
               ('gvfs-daemons','usr/libexec/gvfsd-metadata'),
               ('network-manager','usr/bin/nmcli'),('network-manager','usr/bin/nmtui'),
               ('network-manager-gnome','usr/bin/nm-connection-editor'),
-              ('xfce4-terminal','usr/bin/xfce4-terminal'),
+              ('xfce4-terminal','usr/bin/xfce4-terminal'),('x11vnc','usr/bin/x11vnc'),
               ('wpasupplicant','sbin/wpa_supplicant'),('wireless-regdb','lib/firmware/regulatory.db'),
               ('rfkill','usr/sbin/rfkill')]
     return list(dict.fromkeys(package for package,binary in required if not (root/binary).is_file()))
@@ -272,7 +272,7 @@ def perform(job, progress, log):
             (staged/'etc/NetworkManager/conf.d').mkdir(parents=True,exist_ok=True)
             units=staged/'etc/systemd/system';units.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(BASE/'client/freethinclient-client.service',units/'freethinclient-client.service')
-            for name in ('agent.py','session.py','device_info.py','launch_options.py','network.py','dns_config.py'):
+            for name in ('agent.py','session.py','device_info.py','launch_options.py','network.py','dns_config.py','remote.py'):
                 shutil.copyfile(BASE/'client'/name,client_lib/name)
             autostart=staged/'etc/xdg/autostart';autostart.mkdir(parents=True,exist_ok=True)
             shutil.copyfile(BASE/'client/freethinclient-info.desktop',autostart/'freethinclient-info.desktop')
