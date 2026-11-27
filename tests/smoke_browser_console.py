@@ -28,6 +28,9 @@ from app import fleet
 HTML=b'''<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="/style.css"><link rel="stylesheet" href="/blue.css"></head><body>
 <dialog id="remote-dialog"><h2 id="remote-title"></h2><input type="checkbox" id="remote-control"><button id="remote-start">Conectar</button><button id="remote-close">Fechar</button><button id="remote-fullscreen">Tela inteira</button><p id="remote-status"></p><div id="remote-screen"></div></dialog><script type="module" src="/fixture.js"></script></body></html>'''
 SCRIPT='''import '/remote.js';
+import RFB from '/vendor/novnc/core/rfb.js';
+const originalState=RFB.prototype._updateConnectionState;
+RFB.prototype._updateConnectionState=function(...args){window.testRFB=this;return originalState.apply(this,args);};
 window.testErrors=[];
 window.addEventListener('error',event=>testErrors.push(event.message));
 window.addEventListener('unhandledrejection',event=>testErrors.push(String(event.reason)));
@@ -133,7 +136,7 @@ def main():
         subprocess.run(['chown','thinclient:thinclient','/home/thinclient/.Xauthority'],check=True)
         Path('/var/lib/freethinclient-client').mkdir(exist_ok=True)
         Path('/var/lib/freethinclient-client').chmod(0o755)
-        display=subprocess.Popen(['runuser','-u','thinclient','--','Xvfb',':0','-screen','0','800x600x24','-ac'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
+        display=subprocess.Popen(['runuser','-u','thinclient','--','Xvfb',':0','-screen','0','800x600x24','-ac','-noreset'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
         for _ in range(100):
             if Path('/tmp/.X11-unix/X0').exists():break
             time.sleep(.05)
@@ -180,7 +183,7 @@ def main():
             cdp('Runtime.enable');cdp('Page.navigate',{'url':f'http://127.0.0.1:{server.server_port}/fixture'})
             deadline=time.time()+20;result={}
             while time.time()<deadline:
-                expression="JSON.stringify({status:document.getElementById('remote-status')?.textContent,errors:window.testErrors,canvases:[...document.querySelectorAll('canvas')].map(c=>({width:c.width,height:c.height,pixel:[...c.getContext('2d').getImageData(10,10,1,1).data]}))})"
+                expression="JSON.stringify({status:document.getElementById('remote-status')?.textContent,errors:window.testErrors,connection:window.testRFB?._rfbConnectionState,init:window.testRFB?._rfbInitState,canvases:[...document.querySelectorAll('canvas')].map(c=>({width:c.width,height:c.height,pixel:[...c.getContext('2d').getImageData(10,10,1,1).data]}))})"
                 raw=cdp('Runtime.evaluate',{'expression':expression,'returnByValue':True})
                 value=raw.get('result',{}).get('result',{}).get('value')
                 if value:result=json.loads(value)
