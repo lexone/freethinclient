@@ -8,7 +8,9 @@ const screen=document.getElementById('remote-screen');
 const setStatus=text=>{status.textContent=text;};
 
 function stop() {
-  rfb?.disconnect();channel?.close();rfb=null;channel=null;
+  const previous=rfb, transport=channel;rfb=null;channel=null;
+  previous?.disconnect();transport?.close();
+  document.getElementById('remote-control').disabled=false;
   session=null;screen.replaceChildren();
 }
 
@@ -26,6 +28,7 @@ document.getElementById('remote-start').addEventListener('click',async()=>{
   const button=document.getElementById('remote-start');button.disabled=true;
   try {
     const control=document.getElementById('remote-control').checked;
+    document.getElementById('remote-control').disabled=true;
     session=await window.remoteApi('/api/remote/start',{device:dialog.dataset.device,control});
     setStatus('Aguardando o agente. O cliente precisa da imagem atualizada.');
     channel=new RemoteChannel(session.id,window.remoteApi,setStatus);
