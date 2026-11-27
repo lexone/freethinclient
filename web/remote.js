@@ -6,9 +6,11 @@ const dialog=document.getElementById('remote-dialog');
 const status=document.getElementById('remote-status');
 const screen=document.getElementById('remote-screen');
 const setStatus=text=>{status.textContent=text;};
+let failure='';
 
 function stop() {
   const previous=rfb, transport=channel;rfb=null;channel=null;
+  if(transport?.failure)failure=transport.failure;
   previous?.disconnect();transport?.close();
   document.getElementById('remote-control').disabled=false;
   session=null;screen.replaceChildren();
@@ -16,6 +18,7 @@ function stop() {
 
 window.openRemoteConsole=async device=>{
   stop();
+  failure='';
   document.getElementById('remote-title').textContent='Console de '+device.name;
   document.getElementById('remote-control').checked=false;
   document.getElementById('remote-start').disabled=false;
@@ -27,6 +30,7 @@ window.openRemoteConsole=async device=>{
 document.getElementById('remote-start').addEventListener('click',async()=>{
   const button=document.getElementById('remote-start');button.disabled=true;
   try {
+    failure='';
     const control=document.getElementById('remote-control').checked;
     document.getElementById('remote-control').disabled=true;
     session=await window.remoteApi('/api/remote/start',{device:dialog.dataset.device,control});
@@ -36,9 +40,12 @@ document.getElementById('remote-start').addEventListener('click',async()=>{
     rfb.viewOnly=!control;rfb.scaleViewport=true;rfb.resizeSession=false;
     rfb.qualityLevel=5;rfb.compressionLevel=3;
     rfb.addEventListener('connect',()=>setStatus(control?'Conectado — controle habilitado':'Conectado — somente visualizar'));
-    rfb.addEventListener('disconnect',()=>{setStatus('Console desconectado.');stop();button.disabled=false;});
-    rfb.addEventListener('securityfailure',()=>{setStatus('Falha na autenticação do console. Abra uma nova sessão.');stop();button.disabled=false;});
-  } catch(error){setStatus(error.message);stop();button.disabled=false;}
+    rfb.addEventListener('disconnect',event=>{
+      const message=failure||channel?.failure||(event.detail.clean?'Console desconectado.':'A conexão VNC foi interrompida antes de concluir. Confira se a imagem cliente foi atualizada e o PC reiniciado.');
+      stop();setStatus(message);button.disabled=false;
+    });
+    rfb.addEventListener('securityfailure',()=>{failure='Falha na autenticação do console. Abra uma nova sessão.';stop();setStatus(failure);button.disabled=false;});
+  } catch(error){failure=error.message;stop();setStatus(failure);button.disabled=false;}
 });
 document.getElementById('remote-close').addEventListener('click',()=>dialog.close());
 dialog.addEventListener('close',stop);

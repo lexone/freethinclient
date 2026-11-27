@@ -17,6 +17,7 @@ from pathlib import Path
 
 if os.environ.get('FTC_DISPOSABLE_TEST') != '1' or not Path('/.dockerenv').exists():
     raise SystemExit('Teste exclusivo de contêiner descartável')
+os.umask(0o077)  # Match freethinclient-client.service, including password-dir traversal.
 sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from app.server import ControlServer
 from app.security import password_hash
@@ -27,6 +28,7 @@ subprocess.run(['useradd','-m','thinclient'],check=True)
 Path('/home/thinclient/.Xauthority').touch()
 subprocess.run(['chown','thinclient:thinclient','/home/thinclient/.Xauthority'],check=True)
 Path('/var/lib/freethinclient-client').mkdir(exist_ok=True)
+Path('/var/lib/freethinclient-client').chmod(0o755)  # agent.main exposes only public profile paths.
 display=subprocess.Popen(['runuser','-u','thinclient','--','Xvfb',':0','-screen','0','800x600x24','-ac'],stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL)
 try:
     for _ in range(100):

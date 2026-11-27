@@ -39,15 +39,20 @@ def run(config, token, job, request, stopped):
     folder = None
     sequence = 1
     failed = False
+    error_code = 'local-files'
     try:
         import pwd
         account = pwd.getpwnam('thinclient')
         if not shutil.which('x11vnc'):
+            error_code = 'missing-package'
             raise RuntimeError('x11vnc não instalado')
         # No server-supplied paths, display numbers, commands or network targets.
         folder = Path('/var/lib/freethinclient-client') / ('remote-' + secrets.token_hex(8))
         # The client may read its password but cannot replace paths used by root.
         folder.mkdir(mode=0o711)
+        # The systemd agent uses UMask=0077. mkdir's mode alone would become
+        # 0700 and prevent the unprivileged x11vnc from reading its password.
+        folder.chmod(0o711)
         password_file = folder/'password'
         fd = os.open(password_file, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(fd, 'w') as output:
@@ -60,6 +65,7 @@ def run(config, token, job, request, stopped):
                    '-once', '-nevershared', '-no6', '-noxdamage', '-quiet', '-timeout', '30', '-noclipboard']
         if not job.get('control'):
             command.append('-viewonly')
+        error_code = 'display'
         process = subprocess.Popen(command, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL,
                                    stderr=subprocess.DEVNULL, user=account.pw_uid, group=account.pw_gid,
                                    extra_groups=[], env={'HOME':account.pw_dir, 'PATH':'/usr/bin:/bin', 'DISPLAY':':0'})
@@ -74,6 +80,7 @@ def run(config, token, job, request, stopped):
         if connection is None:
             raise RuntimeError('Tempo esgotado ao abrir x11vnc')
         connection.settimeout(0.05)
+        error_code = 'transport'
         # PXE clients can boot before NTP; do not depend on matching wall clocks.
         deadline = time.monotonic() + min(600, max(0, int(job.get('remaining',600))))
         while not stopped.is_set() and time.monotonic() < deadline:
@@ -104,7 +111,7 @@ def run(config, token, job, request, stopped):
     except Exception:
         failed = True
         try:
-            request(config, '/api/client/remote', dict(id=job['id'],key=job['key'],seq=sequence,state='error'), token)
+            request(config, '/api/client/remote', dict(id=job['id'],key=job['key'],seq=sequence,state='error',error_code=error_code), token)
         except Exception:
             pass
     finally:

@@ -60,6 +60,14 @@ class RelayTests(unittest.TestCase):
         with patch('app.remote.time.time',return_value=time.time()+601):
             self.assertTrue(self.relay.exchange(dict(id=self.job['id'],seq=1),owner='browser-secret')['closed'])
 
+    def test_agent_error_codes_are_safe_and_actionable(self):
+        self.relay.exchange(dict(id=self.job['id'],seq=1,key=self.agent['key'],state='error',error_code='missing-package'),device=self.device)
+        reply=self.relay.exchange(dict(id=self.job['id'],seq=1),owner='browser-secret')
+        self.assertIn('não tem x11vnc',reply['message'])
+        self.relay.exchange(dict(id=self.job['id'],seq=2,key=self.agent['key'],state='error',error_code='secret token arbitrary text'),device=self.device)
+        reply=self.relay.exchange(dict(id=self.job['id'],seq=2),owner='browser-secret')
+        self.assertNotIn('secret token',reply['message'])
+
 
 class RemoteApiTests(test_core.PanelTests):
     def test_login_page_contains_controls_and_actual_ui_version(self):

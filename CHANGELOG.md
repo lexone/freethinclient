@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.4
+
+- Corrige a travessia do diretório da senha temporária do VNC sob UMask=0077 e preserva o motivo de falha no console.
+
 ## 0.2.3
 
 - Corrige a ausência do botão Console remoto, registra a rota Rede e DNS e recarrega a interface quando a versão do servidor muda.

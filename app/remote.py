@@ -124,8 +124,13 @@ class Relay:
             incoming.extend(raw)
             if side == 'agent' and data.get('state') in ('connected', 'error'):
                 item['state'] = data['state']
-                item['message'] = ('Conectado' if data['state'] == 'connected' else
-                                   'Não foi possível abrir a sessão gráfica. Confira o cliente e o pacote x11vnc.')
+                errors = {
+                    'missing-package':'O cliente não tem x11vnc. Atualize os componentes do cliente na imagem e reinicie o PC pelo PXE.',
+                    'local-files':'O agente não conseguiu preparar os arquivos temporários do console. Atualize os componentes do cliente na imagem e reinicie o PC.',
+                    'display':'O x11vnc não conseguiu abrir a sessão gráfica ou ler a credencial temporária. Atualize os componentes do cliente na imagem e reinicie o PC; se persistir, confira o serviço do agente.',
+                    'transport':'A conexão entre o agente e o console foi interrompida. Abra uma nova sessão.'}
+                item['message'] = ('Conectado' if data['state'] == 'connected' else errors.get(data.get('error_code'),
+                                   'Não foi possível abrir a sessão gráfica. Confira o cliente e o pacote x11vnc.'))
             block = bytes(outgoing[:CHUNK]); del outgoing[:CHUNK]
             reply = dict(data=base64.b64encode(block).decode(), state=item['state'],
                          message=item['message'], expires=item['expires'])

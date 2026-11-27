@@ -5,6 +5,7 @@ export default class RemoteChannel {
     this.id=id; this.api=api; this.status=status; this.readyState=0;
     this.binaryType='arraybuffer'; this.protocol=''; this.bufferedAmount=0;
     this.onopen=null; this.onclose=null; this.onerror=null; this.onmessage=null;
+    this.failure='';
     this.queue=[]; this.sequence=1;
     setTimeout(()=>this.loop(),0);
   }
@@ -18,9 +19,9 @@ export default class RemoteChannel {
     if(this.readyState===3)return;
     this.readyState=3;this.queue=[];this.bufferedAmount=0;
     this.api('/api/remote/stop',{id:this.id}).catch(()=>{});
-    this.onclose?.({code:1000,reason:'Console encerrado',wasClean:true});
+    this.onclose?.({code:this.failure?1011:1000,reason:this.failure||'Console encerrado',wasClean:!this.failure});
   }
-  fail(message) {this.status(message);this.onerror?.(new Error(message));this.close();}
+  fail(message) {this.failure=message;this.status(message);this.onerror?.(new Error(message));this.close();}
   async loop() {
     while(this.readyState!==3) {
       const chunks=[];let length=0;
