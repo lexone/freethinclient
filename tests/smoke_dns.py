@@ -8,6 +8,9 @@ sys.path.insert(0,str(Path(__file__).resolve().parents[1]))
 from client import dns_config
 
 resolver=Path('/etc/resolv.conf');original=resolver.read_bytes()
+backend=Path('/etc/NetworkManager/conf.d/99-ftc-test-backend.conf')
+assert not backend.exists(),'Use only a disposable Linux container'
+backend.write_text('[main]\ndns=default\nrc-manager=file\n')
 subprocess.run(['systemctl','start','NetworkManager'],check=True)
 assert not dns_config.CONFIG.exists(),'Use only a disposable Linux container'
 try:
@@ -24,5 +27,6 @@ try:
     print('Real NetworkManager DNS smoke passed: override, resolver generation and removal without restarting connections')
 finally:
     dns_config.CONFIG.unlink(missing_ok=True)
-    subprocess.run(['nmcli','general','reload','conf','dns-rc'],check=False)
+    backend.unlink(missing_ok=True)
+    for flag in ('conf','dns-rc'): subprocess.run(['nmcli','general','reload',flag],check=False)
     resolver.write_bytes(original)

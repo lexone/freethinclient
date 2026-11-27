@@ -77,8 +77,9 @@ def apply(profile):
             if desired: atomic(CONFIG,desired)
             else: CONFIG.unlink(missing_ok=True)
         if desired!=existing or previous.get('configuration','')!=desired or previous.get('state')=='error':
-            subprocess.run(['nmcli','general','reload','conf','dns-rc'],check=True,
-                           capture_output=True,timeout=15)
+            for flag in ('conf','dns-rc'):
+                subprocess.run(['nmcli','general','reload',flag],check=True,
+                               capture_output=True,timeout=15)
         result={'state':'applied' if desired else 'dhcp',
                 'message':('DNS do grupo configurado: '+', '.join(servers(profile.get('dns_servers',[]))))
                     if desired else 'Sem DNS imposto pelo grupo; usando a configuração da conexão.',

@@ -439,7 +439,7 @@ O agente root valida novamente os endereços e grava somente seu arquivo
 global-dns e global-dns-domain-* do NetworkManager. Configurações globais
 substituem os DNS e domínios das conexões ativas enquanto a opção estiver ligada;
 preencha o domínio de pesquisa se precisar resolver nomes internos curtos.
-O agente recarrega configuração e resolvedor com nmcli general reload conf dns-rc,
+O agente recarrega configuração e resolvedor com nmcli general reload conf e, em seguida, nmcli general reload dns-rc,
 sem derrubar interfaces ou mudar IP/gateway. Desmarcar a opção ou revogar a
 aprovação remove somente esse arquivo e recarrega a configuração das conexões.
 Falhas são registradas e tentadas novamente; o cliente precisa alcançar o servidor

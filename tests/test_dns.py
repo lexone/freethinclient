@@ -29,10 +29,10 @@ class DnsTests(unittest.TestCase):
                 self.assertEqual(dns_config.apply(profile)['state'],'applied')
                 self.assertIn('[global-dns-domain-*]\nservers=10.240.0.4,10.240.0.12',config.read_text())
                 self.assertIn('searches=ubec.br,lab.ubec.br',config.read_text())
-                run.assert_called_once_with(['nmcli','general','reload','conf','dns-rc'],check=True,capture_output=True,timeout=15)
-                dns_config.apply(profile);self.assertEqual(run.call_count,1)
+                self.assertEqual([call.args[0] for call in run.call_args_list],[['nmcli','general','reload','conf'],['nmcli','general','reload','dns-rc']])
+                dns_config.apply(profile);self.assertEqual(run.call_count,2)
                 self.assertEqual(dns_config.apply({'approved':False})['state'],'dhcp')
-                self.assertFalse(config.exists());self.assertEqual(run.call_count,2)
+                self.assertFalse(config.exists());self.assertEqual(run.call_count,4)
 
     def test_dns_reload_failure_is_reported_and_retried(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -42,7 +42,7 @@ class DnsTests(unittest.TestCase):
                 self.assertEqual(dns_config.status()['state'],'error')
                 run.side_effect=None
                 self.assertEqual(dns_config.apply(profile)['state'],'applied')
-                self.assertEqual(run.call_count,2)
+                self.assertEqual(run.call_count,3)
 
     def test_schema_migrates_and_dns_result_is_delivered_in_fleet(self):
         with tempfile.TemporaryDirectory() as temporary:
