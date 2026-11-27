@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.5
+
+- Estado real de negociação VNC, tratamento de erros do decodificador, diagnóstico de tráfego/resolução e teste de pixels no Chrome com x11vnc real.
+
 ## 0.2.4
 
 - Corrige a travessia do diretório da senha temporária do VNC sob UMask=0077 e preserva o motivo de falha no console.

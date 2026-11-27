@@ -3,7 +3,7 @@ const fs=require('node:fs');
 const path=require('node:path');
 const vm=require('node:vm');
 const source=fs.readFileSync(path.join(__dirname,'../web/remote-channel.js'),'utf8').replace('export default class','class');
-const context=vm.createContext({setTimeout,Uint8Array,Error,btoa:s=>Buffer.from(s,'binary').toString('base64'),atob:s=>Buffer.from(s,'base64').toString('binary')});
+const context=vm.createContext({console:{error(){}},setTimeout,Uint8Array,Error,btoa:s=>Buffer.from(s,'binary').toString('base64'),atob:s=>Buffer.from(s,'base64').toString('binary')});
 vm.runInContext(source+'\nglobalThis.Channel=RemoteChannel',context);
 async function main(){
   const calls=[];let failed=false;let opened=0;let received=0;let finished;
@@ -29,6 +29,15 @@ async function main(){
   bad.onclose=event=>{assert.equal(event.wasClean,false);assert.match(event.reason,/Atualize os componentes/);failedClose();};
   await failedDone;
   assert.match(bad.failure,/Atualize os componentes/);
+  let decoderClosed;
+  const decoderDone=new Promise(resolve=>decoderClosed=resolve);
+  const decoder=new context.Channel('decoder',async path=>path.endsWith('/stop')?{}:{state:'connected',data:Buffer.from('RFB').toString('base64')},()=>{});
+  decoder.onmessage=()=>{throw Error('decoder fixture');};
+  decoder.onclose=()=>decoderClosed();
+  await decoderDone;
+  assert.match(decoder.failure,/decoder fixture/,'A decoder exception must close with a visible failure');
+  assert.equal(decoder.receivedBytes,3);
+  assert.equal(decoder.polls,1);
 
   // Exercise the actual console controller; a disconnect must not hide the error.
   const nodes=new Map();
@@ -40,7 +49,7 @@ async function main(){
     disconnect(){if(this.closed)return;this.closed=true;this.listeners.disconnect?.({detail:{clean:true}});}
   }
   class FakeChannel {constructor(){this.failure='';}close(){}}
-  const ui=vm.createContext({document:{getElementById:element},window:{addEventListener(){},remoteApi:async()=>({id:'session',password:'fixture'})},RFB:FakeRFB,RemoteChannel:FakeChannel});
+  const ui=vm.createContext({setTimeout:()=>1,clearTimeout(){},setInterval:()=>1,clearInterval(){},document:{getElementById:element},window:{addEventListener(){},remoteApi:async()=>({id:'session',password:'fixture'})},RFB:FakeRFB,RemoteChannel:FakeChannel});
   const controller=fs.readFileSync(path.join(__dirname,'../web/remote.js'),'utf8').replace(/^import .*;\r?\n/gm,'');
   vm.runInContext(controller,ui);
   await ui.window.openRemoteConsole({id:'pc',name:'Test'});

@@ -6,6 +6,7 @@ export default class RemoteChannel {
     this.binaryType='arraybuffer'; this.protocol=''; this.bufferedAmount=0;
     this.onopen=null; this.onclose=null; this.onerror=null; this.onmessage=null;
     this.failure='';
+    this.receivedBytes=0;this.sentBytes=0;this.polls=0;
     this.queue=[]; this.sequence=1;
     setTimeout(()=>this.loop(),0);
   }
@@ -23,6 +24,10 @@ export default class RemoteChannel {
   }
   fail(message) {this.failure=message;this.status(message);this.onerror?.(new Error(message));this.close();}
   async loop() {
+    try {await this.pump();}
+    catch(error){console.error('Falha no fluxo noVNC:',error);this.fail('Falha ao processar o VNC: '+String(error.message||error).slice(0,180));}
+  }
+  async pump() {
     while(this.readyState!==3) {
       const chunks=[];let length=0;
       while(this.queue.length && length+this.queue[0].length<=256*1024) {
@@ -40,10 +45,11 @@ export default class RemoteChannel {
       }
       if(this.readyState===3)return;
       this.sequence++;
+      this.polls++;this.sentBytes+=length;
       if(reply.closed || reply.state==='error'){this.fail(reply.message||'Console encerrado.');return;}
-      this.status(reply.message||'Conectando');
+      this.status(reply.state==='connected'?'Agente conectado. Negociando a sessão VNC.':reply.message||'Conectando');
       if(reply.state==='connected' && this.readyState===0){this.readyState=1;this.onopen?.();}
-      if(reply.data){const binary=atob(reply.data),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));this.onmessage?.({data:bytes.buffer});}
+      if(reply.data){const binary=atob(reply.data),bytes=Uint8Array.from(binary,c=>c.charCodeAt(0));this.receivedBytes+=bytes.length;this.onmessage?.({data:bytes.buffer});}
       await new Promise(r=>setTimeout(r,reply.data?0:60));
     }
   }
