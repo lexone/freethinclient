@@ -82,6 +82,7 @@ class ImageRulesTests(unittest.TestCase):
             root=Path(directory)
             missing=image_worker.missing_client_packages(root)
             self.assertIn('libglib2.0-bin',missing);self.assertIn('xdg-user-dirs',missing)
+            self.assertIn('xfce4-terminal',missing);self.assertIn('wpasupplicant',missing)
             (root/'usr/bin').mkdir(parents=True)
             (root/'usr/bin/gio').write_text('fixture')
             (root/'usr/bin/xdg-user-dir').write_text('fixture')

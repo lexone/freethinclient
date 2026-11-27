@@ -45,6 +45,7 @@ xdg-user-dirs
 lightdm
 lightdm-gtk-greeter
 xfce4
+xfce4-terminal
 openbox
 polkitd
 papirus-icon-theme

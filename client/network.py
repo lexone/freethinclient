@@ -37,7 +37,7 @@ def diagnostics():
               ('Endereços IP', ['ip','-br','address']),
               ('Rotas', ['ip','route']),
               ('DNS e gateway por placa', ['nmcli','-f','GENERAL.DEVICE,IP4.GATEWAY,IP4.DNS,IP6.GATEWAY,IP6.DNS','device','show']),
-              ('Bloqueios de Wi-Fi', ['rfkill','list'])]
+              ('Bloqueios de Wi-Fi', ['/usr/sbin/rfkill','list'])]
     result=['DIAGNÓSTICO DE REDE — FreeThinClient']
     for label,args in sections: result += ['\n'+label+'\n'+output(args)]
     try: resolver=Path('/etc/resolv.conf').read_text()

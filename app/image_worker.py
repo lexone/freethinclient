@@ -170,6 +170,7 @@ def missing_client_packages(root):
               ('gvfs-daemons','usr/libexec/gvfsd-metadata'),
               ('network-manager','usr/bin/nmcli'),('network-manager','usr/bin/nmtui'),
               ('network-manager-gnome','usr/bin/nm-connection-editor'),
+              ('xfce4-terminal','usr/bin/xfce4-terminal'),
               ('wpasupplicant','sbin/wpa_supplicant'),('wireless-regdb','lib/firmware/regulatory.db'),
               ('rfkill','usr/sbin/rfkill')]
     return list(dict.fromkeys(package for package,binary in required if not (root/binary).is_file()))
