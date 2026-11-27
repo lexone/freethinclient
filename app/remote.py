@@ -66,7 +66,7 @@ class Relay:
                         item.update(state='error', message='Atualize os componentes do cliente na imagem e reinicie o PC pelo PXE.')
                         return None
                     return dict(id=identity, key=item['agent_key'], password=item['password'],
-                                expires=item['expires'], control=item['control'])
+                                expires=item['expires'], remaining=max(0, int(item['expires']-time.time())), control=item['control'])
         return None
 
     def close(self, identity, owner):

@@ -38,6 +38,7 @@ def run(config, token, job, request, stopped):
     process = connection = None
     folder = None
     sequence = 1
+    failed = False
     try:
         import pwd
         account = pwd.getpwnam('thinclient')
@@ -73,8 +74,9 @@ def run(config, token, job, request, stopped):
         if connection is None:
             raise RuntimeError('Tempo esgotado ao abrir x11vnc')
         connection.settimeout(0.05)
-        deadline = min(float(job['expires']), time.time()+600)
-        while not stopped.is_set() and time.time() < deadline:
+        # PXE clients can boot before NTP; do not depend on matching wall clocks.
+        deadline = time.monotonic() + min(600, max(0, int(job.get('remaining',600))))
+        while not stopped.is_set() and time.monotonic() < deadline:
             try:
                 outgoing = connection.recv(256*1024)
                 if not outgoing:
@@ -100,13 +102,15 @@ def run(config, token, job, request, stopped):
                 connection.sendall(incoming)
                 connection.settimeout(0.05)
     except Exception:
+        failed = True
         try:
             request(config, '/api/client/remote', dict(id=job['id'],key=job['key'],seq=sequence,state='error'), token)
         except Exception:
             pass
     finally:
         try:
-            request(config, '/api/client/remote', dict(id=job['id'],key=job['key'],seq=sequence,state='closed'), token)
+            if not failed:
+                request(config, '/api/client/remote', dict(id=job['id'],key=job['key'],seq=sequence,state='closed'), token)
         except Exception:
             pass
         if connection:
