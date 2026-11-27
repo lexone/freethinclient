@@ -47,6 +47,12 @@ class FixtureHandler(Handler):
         if self.path=='/fixture.js':return self.reply(200,SCRIPT.replace('__DEVICE__',self.server.fixture_device).encode(),mime='text/javascript')
         return super().get()
 
+    def post(self,path,data):
+        if path=='/fixture/jpeg':
+            self.server.fixture_jpeg_bytes=base64.b64decode(data['data'],validate=True)
+            return self.reply(200,{'ok':True})
+        return super().post(path,data)
+
 
 def fake_agent(server, device, stopped):
     """Minimal authenticated RFB 3.8 server: red screen, VNC auth challenge."""
@@ -101,7 +107,16 @@ def fake_agent(server, device, stopped):
                     del buf[:10]
                     value=255<<fmt[7]
                     pixel=value.to_bytes(fmt[0]//8,'big' if fmt[2] else 'little')
-                    out+=b'\0\0\0\x01'+struct.pack('!HHHHi',0,0,320,200,0)+pixel*(320*200)
+                    if server.fixture_jpeg:
+                        jpeg=server.fixture_jpeg_bytes
+                        length=len(jpeg);compact=bytearray()
+                        for _ in range(2):
+                            if length<128:break
+                            compact.append((length&127)|128);length>>=7
+                        compact.append(length)
+                        out+=b'\0\0\0\x01'+struct.pack('!HHHHi',0,0,320,200,7)+b'\x90'+bytes(compact)+jpeg
+                    else:
+                        out+=b'\0\0\0\x01'+struct.pack('!HHHHi',0,0,320,200,0)+pixel*(320*200)
                     server.fixture_frames+=1
                 elif kind==4:
                     if len(buf)<8:break
@@ -121,7 +136,7 @@ def fake_agent(server, device, stopped):
 
 
 def main():
-    parser=argparse.ArgumentParser();parser.add_argument('--chrome');parser.add_argument('--real-vnc',action='store_true');args=parser.parse_args()
+    parser=argparse.ArgumentParser();parser.add_argument('--chrome');parser.add_argument('--real-vnc',action='store_true');parser.add_argument('--jpeg',action='store_true');args=parser.parse_args()
     chrome=args.chrome or shutil.which('google-chrome') or shutil.which('chromium')
     if os.name=='nt':chrome=chrome or r'C:\Program Files\Google\Chrome\Application\chrome.exe'
     if not chrome:raise SystemExit('Chrome is required')
@@ -150,6 +165,10 @@ def main():
         device=enrolled['id']
         fleet.assign(server.store,dict(id=device,group_id=group));fleet.heartbeat(server.store,device,{})
         server.fixture_device=device;server.fixture_stage='waiting';server.fixture_frames=0
+        server.fixture_jpeg=args.jpeg;server.fixture_jpeg_bytes=b''
+        if args.jpeg:
+            global SCRIPT
+            SCRIPT=SCRIPT.replace("try {const login=", "try {const color=document.createElement('canvas');color.width=320;color.height=200;const ctx=color.getContext('2d');ctx.fillStyle='#ff0000';ctx.fillRect(0,0,320,200);await fetch('/fixture/jpeg',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({data:color.toDataURL('image/jpeg',0.9).split(',')[1]})});const login=")
         stopped=threading.Event()
         def real_agent():
             from client.remote import run
@@ -179,16 +198,17 @@ def main():
                 while True:
                     data=json.loads(ws.recv())
                     if data.get('method')=='Runtime.exceptionThrown':errors.append(data['params']['exceptionDetails'].get('text'))
+                    if data.get('method')=='Log.entryAdded' and data['params']['entry'].get('level')=='error':errors.append(data['params']['entry']['text'][:300])
                     if data.get('id')==identity:return data
-            cdp('Runtime.enable');cdp('Page.navigate',{'url':f'http://127.0.0.1:{server.server_port}/fixture'})
+            cdp('Runtime.enable');cdp('Log.enable');cdp('Page.navigate',{'url':f'http://127.0.0.1:{server.server_port}/fixture'})
             deadline=time.time()+20;result={}
             while time.time()<deadline:
                 expression="JSON.stringify({status:document.getElementById('remote-status')?.textContent,errors:window.testErrors,connection:window.testRFB?._rfbConnectionState,init:window.testRFB?._rfbInitState,canvases:[...document.querySelectorAll('canvas')].map(c=>({width:c.width,height:c.height,pixel:[...c.getContext('2d').getImageData(10,10,1,1).data]}))})"
                 raw=cdp('Runtime.evaluate',{'expression':expression,'returnByValue':True})
                 value=raw.get('result',{}).get('result',{}).get('value')
                 if value:result=json.loads(value)
-                if any(c['pixel'][:3]==[255,0,0] for c in result.get('canvases',[])):
-                    print('Real browser console passed: noVNC authentication, relay, canvas red pixels and live controller')
+                if any(c['pixel'][0]>245 and c['pixel'][1]<10 and c['pixel'][2]<10 for c in result.get('canvases',[])):
+                    print('Real browser console passed: noVNC authentication, relay, canvas red pixels and live controller'+(' (Tight JPEG)' if args.jpeg else ''))
                     return
                 time.sleep(.1)
             raise AssertionError(dict(result=result,protocol=server.fixture_stage,frames=server.fixture_frames,errors=errors))

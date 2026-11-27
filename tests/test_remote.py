@@ -75,10 +75,14 @@ class RemoteApiTests(test_core.PanelTests):
         from app.server import VERSION
         with urllib.request.urlopen(self.url + '/') as response:
             page=response.read().decode()
+            policy=response.headers['Content-Security-Policy']
         self.assertIn('content="'+VERSION+'"',page)
         self.assertNotIn('__FTC_UI_VERSION__',page)
         self.assertIn('id="remember-login"',page)
         self.assertIn('Manter conectado por 30 dias',page)
+        self.assertIn("img-src 'self' blob: data:;",policy)
+        self.assertIn("script-src 'self';",policy)
+        self.assertNotIn('unsafe-inline',policy)
 
     def test_console_requires_admin_csrf_and_enrolled_agent(self):
         self.assertEqual(self.request('/api/remote/start',{'device':'anything'})[0],403)

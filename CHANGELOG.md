@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.2.6
+
+- Corrige a tela vazia no console VNC: permite imagens data: na diretiva img-src da CSP, utilizadas pelos trechos Tight JPEG/PNG do noVNC. Teste de pixels JPEG no Chrome reproduz a falha antes da correção e valida a imagem depois.
+
 ## 0.2.5
 
 - Estado real de negociação VNC, tratamento de erros do decodificador, diagnóstico de tráfego/resolução e teste de pixels no Chrome com x11vnc real.
