@@ -1,4 +1,9 @@
-## Próxima revisão do piloto
+## 0.2.1 - primeira release assinada para atualização remota
+
+- Publicação de pacote, manifesto e assinatura RSA no GitHub, com validação do download e instalação via API do painel em servidor descartável.
+- Inicialização automática e parâmetros validados por aplicativo, modos janela/tela inteira/quiosque e RDP com destino fixo ou informado ao conectar.
+- Aba Rede e DNS, controle de permissões de rede/Wi-Fi e diagnóstico local de conectividade.
+- DNS por grupo aplicado pelo agente e resultado informado ao painel; correção do parâmetro ip=dhcp no boot Debian Live.
 
 - Reparação das dependências GIO/XDG na imagem e atualização do desktop/barra sem corrida de encerramento.
 

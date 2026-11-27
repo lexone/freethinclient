@@ -3,43 +3,131 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: Stable version matching VERSION (e.g. 0.1.1)
+        description: Stable version matching VERSION (e.g. 0.2.1)
         required: true
+  push:
+    branches: ['release/v*']
 permissions:
   contents: read
+concurrency:
+  group: signed-release-${{ github.ref }}
+  cancel-in-progress: false
 jobs:
   release:
     runs-on: ubuntu-24.04
+    timeout-minutes: 20
     environment: release
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          fetch-depth: 0
       - name: Validate version and run tests
+        id: version
         env:
           REQUESTED_VERSION: ${{ inputs.version }}
         run: |
-          python3 -c 'import os,pathlib; from app.security import version_tuple; v=pathlib.Path("VERSION").read_text().strip(); version_tuple(v); assert v == os.environ["REQUESTED_VERSION"]'
+          python3 - <<'PYVERSION'
+          import os,pathlib
+          from app.security import version_tuple
+          version=pathlib.Path('VERSION').read_text().strip()
+          version_tuple(version)
+          if os.environ['GITHUB_EVENT_NAME']=='push':
+              assert os.environ['GITHUB_REF_NAME']=='release/v'+version
+          else:
+              assert version==os.environ['REQUESTED_VERSION']
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output: output.write('version='+version+'\n')
+          PYVERSION
           python3 -m unittest discover -s tests -v
-          bash -n install.sh
-          node --check web/app.js
-      - name: Build signed package
+          for script in install.sh scripts/*.sh; do bash -n "$script"; done
+          for script in web/*.js; do node --check "$script"; done
+          node tests/ui-monitor.cjs
+          node tests/ui-network.cjs
+      - name: Build signed package and verify exact bytes
         env:
           RELEASE_PRIVATE_KEY: ${{ secrets.RELEASE_PRIVATE_KEY }}
         run: |
-          python3 - <<'PY'
-          import os,pathlib,subprocess
+          python3 - <<'PYSIGN'
+          import hashlib,json,os,pathlib,subprocess,tempfile
+          from app.release import verify_manifest,validate_package,extract_package
           key=pathlib.Path(os.environ['RUNNER_TEMP'])/'release-private.pem'
+          public=pathlib.Path(os.environ['RUNNER_TEMP'])/'release-public.pem'
           secret=os.environ.get('RELEASE_PRIVATE_KEY','')
           if not secret: raise SystemExit('Configure o secret RELEASE_PRIVATE_KEY no environment release.')
-          key.write_text(secret); key.chmod(0o600)
+          key.write_text(secret);key.chmod(0o600)
           try:
-              subprocess.run(['python3','scripts/build-release.py','--key',str(key),'--repository',os.environ['GITHUB_REPOSITORY']],check=True)
-          finally:
-              key.unlink(missing_ok=True)
-          PY
+              subprocess.run(['openssl','pkey','-in',str(key),'-pubout','-out',str(public)],check=True,capture_output=True)
+              subprocess.run(['python3','scripts/build-release.py','--key',str(key),
+                  '--repository',os.environ['GITHUB_REPOSITORY'],'--minimum-version','0.2.0'],check=True)
+          finally: key.unlink(missing_ok=True)
+          with tempfile.TemporaryDirectory() as temporary:
+              manifest=verify_manifest(pathlib.Path('dist/manifest.json').read_bytes(),
+                  pathlib.Path('dist/manifest.sig').read_bytes(),public,temporary,os.environ['GITHUB_REPOSITORY'])
+              package=pathlib.Path('dist')/manifest['asset']
+              validate_package(package,manifest)
+              extract_package(package,pathlib.Path(temporary)/'verified',manifest['version'])
+          der=subprocess.run(['openssl','pkey','-pubin','-in',str(public),'-outform','DER'],check=True,capture_output=True).stdout
+          with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as output:
+              output.write('Signing public key SHA-256: `'+hashlib.sha256(der).hexdigest()+'`\n')
+          PYSIGN
       - name: Publish stable release
+        id: publish
         env:
           GH_TOKEN: ${{ github.token }}
-          REQUESTED_VERSION: ${{ inputs.version }}
-        run: gh release create "v$REQUESTED_VERSION" dist/* --target "$GITHUB_SHA" --title "FreeThinClient $REQUESTED_VERSION" --generate-notes
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          python3 - <<'PYPUBLISH'
+          import json,os,pathlib,subprocess
+          version=os.environ['RELEASE_VERSION'];tag='v'+version
+          result=subprocess.run(['gh','release','view',tag,'--json','isDraft,isPrerelease,targetCommitish'],capture_output=True,text=True)
+          if result.returncode==0:
+              release=json.loads(result.stdout)
+              if release['targetCommitish']!=os.environ['GITHUB_SHA']:
+                  raise SystemExit('A tag desta versão pertence a outro commit; não será substituída.')
+              if not release['isDraft'] and not release['isPrerelease']:
+                  print('Release estável existente preservada; executando apenas a validação remota.')
+                  raise SystemExit(0)
+          else:
+              subprocess.run(['gh','release','create',tag,'--draft','--target',os.environ['GITHUB_SHA'],
+                  '--title','FreeThinClient '+version,'--notes-file','docs/RELEASE-0.2.1.md'],check=True)
+          assets=[str(path) for path in sorted(pathlib.Path('dist').iterdir()) if path.is_file()]
+          assert len(assets)==3
+          subprocess.run(['gh','release','upload',tag,*assets,'--clobber'],check=True)
+          subprocess.run(['gh','release','edit',tag,'--draft=false','--prerelease=false','--latest'],check=True)
+          with open(os.environ['GITHUB_OUTPUT'],'a') as output:output.write('published=true\n')
+          PYPUBLISH
+      - name: Validate actual GitHub download and remote installation
+        env:
+          FTC_GITHUB_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          baseline_dir="$RUNNER_TEMP/ftc-release-baseline"
+          mkdir -p "$baseline_dir"
+          git archive cc758825ab5a9beb1d4723041dadd4acda18d2ce | tar -x -C "$baseline_dir"
+          docker run -d --name ftc-release-validation --privileged --cgroupns=host \
+            -v /sys/fs/cgroup:/sys/fs/cgroup:rw -v "$baseline_dir:/source:ro" \
+            -v "$PWD:/validation:ro" -v "$RUNNER_TEMP/release-public.pem:/tmp/ftc-release-public.pem:ro" \
+            ubuntu:24.04 /bin/bash -c 'apt-get update && DEBIAN_FRONTEND=noninteractive apt-get install -y systemd systemd-sysv sudo && exec /sbin/init'
+          for attempt in $(seq 1 60); do
+            if docker exec ftc-release-validation systemctl is-system-running 2>/dev/null | grep -Eq 'running|degraded'; then break; fi
+            sleep 2
+          done
+          docker exec ftc-release-validation bash /source/install.sh --server-name 127.0.0.1
+          docker exec ftc-release-validation install -m 0644 /tmp/ftc-release-public.pem /etc/freethinclient/release-public.pem
+          docker exec -e FTC_DISPOSABLE_TEST=1 -e FTC_GITHUB_TOKEN ftc-release-validation \
+            python3 /validation/tests/smoke_remote_update.py --version "$RELEASE_VERSION"
+          docker exec -e FTC_DISPOSABLE_TEST=1 ftc-release-validation python3 /validation/tests/smoke_update.py
+          echo 'Signed GitHub release, remote install and health-failure rollback validated.' >> "$GITHUB_STEP_SUMMARY"
+      - name: Quarantine a newly published release if validation failed
+        if: failure() && steps.publish.outputs.published == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+        run: gh release edit "v$RELEASE_VERSION" --prerelease --latest=false
+      - name: Remote validation diagnostics
+        if: failure()
+        run: docker exec ftc-release-validation journalctl --no-pager -n 80 || true
+      - name: Clean validation container
+        if: always()
+        run: docker rm -f ftc-release-validation || true

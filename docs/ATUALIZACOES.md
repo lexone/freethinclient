@@ -95,3 +95,35 @@ A chave pública nunca é trocada automaticamente pelo pacote. Gere a nova chave
 fora do git, distribua a nova pública por acesso administrativo autenticado,
 configure a nova privada no environment e só então publique a próxima release.
 Uma perda da chave privada exige esse procedimento, não desativação da assinatura.
+
+
+## Publicação e teste da release 0.2.1
+
+O workflow também inicia em um push para release/vX.Y.Z. O nome da branch deve
+corresponder exatamente ao VERSION. A chave continua no environment release e
+as proteções/revisores configurados nesse environment continuam sendo exigidos.
+Os três assets são verificados localmente com a chave pública derivada, enviados
+primeiro a um draft e então publicados como release estável. O workflow não
+substitui uma release estável já existente nem permite reutilizar uma versão em
+outro commit.
+
+Após publicar, um Ubuntu 24.04 descartável é instalado com o baseline 0.2.0. O teste
+usa o token temporário do job e a chave pública do publicador para consultar e
+instalar a release real do GitHub por meio da API do painel. Valida autenticação,
+CSRF, permissões, assinatura, SHA-256, backup, saúde, persistência e novo login.
+Depois executa o teste de falha de saúde e rollback com pacotes de teste somente
+no contêiner; pacotes defeituosos não são publicados. Se uma publicação nova
+falhar, a release é marcada como prerelease e deixa de ser oferecida pelo updater.
+Esse teste não modifica nem valida a VM física do usuário.
+
+No servidor instalado, uma verificação adicional sem instalar ou reiniciar pode
+ser executada após receber os scripts desta versão:
+
+```bash
+sudo python3 /opt/freethinclient/current/scripts/verify-remote-release.py --expected-version 0.2.1
+```
+
+A saída contém apenas versão, resultado da verificação e fingerprint da chave
+pública; não inclui token ou chave privada. Para o teste real na VM, use a aba
+Atualizações, confira a assinatura, aplique 0.2.1 e recarregue/entre novamente.
+A imagem Linux continua tendo seu próprio fluxo em Imagens e boot.
