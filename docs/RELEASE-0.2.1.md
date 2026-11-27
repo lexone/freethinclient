@@ -1,5 +1,7 @@
 # FreeThinClient 0.2.1
 
+O instalador distribui a chave pública oficial a todos os servidores novos; a chave privada de assinatura fica restrita ao publicador/GitHub Actions. Instalações existentes preservam sua chave.
+
 Primeira release estável assinada para testar a atualização remota do painel a partir da versão 0.2.0.
 
 Inclui grupos e aprovação de clientes, contas e auditoria, desktop Blue Workspace, atalhos e ações de energia, modos de abertura e inicialização de aplicativos, RDP direto ou com destino informado ao conectar, permissões de rede/Wi-Fi e DNS gerenciado por grupo. A publicação PXE omite o parâmetro ip=dhcp que produzia um resolvedor inválido no piloto.

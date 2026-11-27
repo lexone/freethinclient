@@ -125,7 +125,8 @@ class ReleaseTests(unittest.TestCase):
         validate_package(package, manifest)
         extract_package(package, self.root / "extracted", manifest["version"])
         self.assertTrue((self.root / "extracted" / "web" / "index.html").exists())
-        self.assertFalse(list((self.root / "extracted").rglob("*.pem")))
+        self.assertEqual([file.relative_to(self.root / "extracted").as_posix() for file in (self.root / "extracted").rglob("*.pem")],["deploy/release-public.pem"])
+        self.assertEqual((self.root / "extracted/deploy/release-public.pem").read_bytes(),(Path(__file__).parents[1]/"deploy/release-public.pem").read_bytes())
 
 
 class PanelTests(unittest.TestCase):

@@ -2,15 +2,24 @@
 
 ## Preparar a primeira publicação
 
-O instalador gera uma chave RSA de 3072 bits no servidor. Somente a pública fica
-disponível para verificação; a privada permanece em
-`/root/freethinclient-signing/release-private.pem` (0600).
+O instalador oficial inclui deploy/release-public.pem e distribui somente essa
+chave pública para /etc/freethinclient/release-public.pem em cada servidor.
+Instalações novas não geram chaves privadas de assinatura. A chave privada do
+publicador original permanece em /root/freethinclient-signing/release-private.pem
+(0600) e no secret de publicação; ela não deve ser copiada para consumidores.
+Instalações existentes preservam a chave pública já configurada.
+
+Para um publicador/repositório próprio, use --repository DONO/NOME e
+--release-public-key /caminho/chave-publica.pem na instalação. O instalador exige
+uma chave explícita para outro repositório. Não substitua a pública de um servidor
+existente apenas para aceitar uma assinatura desconhecida; confirme a origem.
 
 1. Faça backup criptografado da privada em um cofre.
 2. No GitHub, crie o environment **release** e configure revisores obrigatórios.
 3. Configure o secret **RELEASE_PRIVATE_KEY** nesse environment com o PEM
    completo da chave privada do servidor. Nunca cole a chave no chat ou no git.
 4. A chave pública fixada no servidor deve corresponder à privada usada no workflow.
+   O workflow também compara a chave do secret à pública oficial incluída no instalador.
 
 Com GitHub CLI autenticado no servidor, é possível enviar sem exibir a chave:
 

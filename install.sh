@@ -10,15 +10,19 @@ source /etc/os-release
 SOURCE=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 SERVER_NAME=''
 REPOSITORY='lexone/freethinclient'
+RELEASE_PUBLIC_KEY="$SOURCE/deploy/release-public.pem"
+CUSTOM_RELEASE_KEY=false
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --server-name) SERVER_NAME=${2:?Informe IP ou DNS}; shift 2 ;;
     --repository) REPOSITORY=${2:?Informe dono/repositorio}; shift 2 ;;
+    --release-public-key) RELEASE_PUBLIC_KEY=${2:?Informe o caminho da chave pública}; CUSTOM_RELEASE_KEY=true; shift 2 ;;
     *) echo "Argumento desconhecido: $1" >&2; exit 1 ;;
   esac
 done
 [[ -n "$SERVER_NAME" ]] || { echo 'Uso: sudo bash install.sh --server-name IP_OU_DNS' >&2; exit 1; }
 export SERVER_NAME REPOSITORY SOURCE
+[[ "$REPOSITORY" == lexone/freethinclient || "$CUSTOM_RELEASE_KEY" == true ]] || { echo 'Outro publicador exige --release-public-key com sua chave pública.' >&2; exit 1; }
 python3 - <<'PY'
 import ipaddress,os,re
 from pathlib import Path
@@ -39,9 +43,11 @@ if [[ -f /etc/freethinclient/panel.json ]]; then
   exit 0
 fi
 [[ -f "$SOURCE/app/server.py" && -f "$SOURCE/web/index.html" ]] || { echo 'Checkout incompleto'; exit 1; }
+[[ -r "$RELEASE_PUBLIC_KEY" ]] || { echo 'Chave pública de releases ausente ou ilegível.' >&2; exit 1; }
 export DEBIAN_FRONTEND=noninteractive
 apt-get update
 apt-get install -y python3 openssl nginx ca-certificates open-vm-tools
+openssl pkey -pubin -in "$RELEASE_PUBLIC_KEY" -noout 2>/dev/null || { echo 'Chave pública inválida.' >&2; exit 1; }
 if ss -ltnH | awk '{print $4}' | grep -Eq ':(8080|8443)$'; then
   echo 'As portas 8080/8443 já estão em uso; instalação interrompida.' >&2; exit 1
 fi
@@ -49,7 +55,7 @@ id freethinclient >/dev/null 2>&1 || useradd --system --home /var/lib/freethincl
 install -d -m 0755 /opt/freethinclient /opt/freethinclient/releases /var/lib/freethinclient-update
 install -d -m 0750 -o root -g freethinclient /etc/freethinclient
 install -d -m 0750 -o freethinclient -g freethinclient /var/lib/freethinclient /var/lib/freethinclient/updates
-install -d -m 0700 /var/backups/freethinclient /root/freethinclient-signing
+install -d -m 0700 /var/backups/freethinclient
 VERSION=$(tr -d '\r\n' < "$SOURCE/VERSION")
 DEST="/opt/freethinclient/releases/$VERSION-initial"
 [[ ! -e "$DEST" ]] || { echo 'Release inicial já existe. Confira instalação parcial antes de repetir.' >&2; exit 1; }
@@ -61,13 +67,8 @@ chown -R root:root "$DEST"
 find "$DEST" -type d -exec chmod 0755 {} +
 find "$DEST" -type f -exec chmod 0644 {} +
 ln -s "$DEST" /opt/freethinclient/current
-# A signing key is unique to this initial installation. Private key NEVER enters git.
-if [[ ! -f /root/freethinclient-signing/release-private.pem ]]; then
-  openssl genpkey -algorithm RSA -pkeyopt rsa_keygen_bits:3072 -out /root/freethinclient-signing/release-private.pem 2>/dev/null
-fi
-chmod 0600 /root/freethinclient-signing/release-private.pem
-openssl pkey -in /root/freethinclient-signing/release-private.pem -pubout -out /etc/freethinclient/release-public.pem 2>/dev/null
-chmod 0644 /etc/freethinclient/release-public.pem
+# Every official server verifies the same publisher; no signing private key is created.
+install -m 0644 "$RELEASE_PUBLIC_KEY" /etc/freethinclient/release-public.pem
 python3 - <<'PY'
 import ipaddress,json,os,secrets,subprocess,sys
 from pathlib import Path

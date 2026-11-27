@@ -58,6 +58,9 @@ jobs:
           key.write_text(secret);key.chmod(0o600)
           try:
               subprocess.run(['openssl','pkey','-in',str(key),'-pubout','-out',str(public)],check=True,capture_output=True)
+              expected=subprocess.run(['openssl','pkey','-pubin','-in','deploy/release-public.pem','-outform','DER'],check=True,capture_output=True).stdout
+              actual=subprocess.run(['openssl','pkey','-pubin','-in',str(public),'-outform','DER'],check=True,capture_output=True).stdout
+              if actual!=expected: raise SystemExit('O secret de assinatura não corresponde à chave pública oficial do instalador.')
               subprocess.run(['python3','scripts/build-release.py','--key',str(key),
                   '--repository',os.environ['GITHUB_REPOSITORY'],'--minimum-version','0.2.0'],check=True)
           finally: key.unlink(missing_ok=True)
@@ -90,7 +93,8 @@ jobs:
                   raise SystemExit(0)
           else:
               subprocess.run(['gh','release','create',tag,'--draft','--target',os.environ['GITHUB_SHA'],
-                  '--title','FreeThinClient '+version,'--notes-file','docs/RELEASE-0.2.1.md'],check=True)
+                  '--title','FreeThinClient '+version,
+                  *(['--notes-file','docs/RELEASE-'+version+'.md'] if pathlib.Path('docs/RELEASE-'+version+'.md').is_file() else ['--generate-notes'])],check=True)
           assets=[str(path) for path in sorted(pathlib.Path('dist').iterdir()) if path.is_file()]
           assert len(assets)==3
           subprocess.run(['gh','release','upload',tag,*assets,'--clobber'],check=True)
