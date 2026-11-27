@@ -21,6 +21,7 @@ jobs:
           node --check web/remote-channel.js
           node tests/ui-remote.cjs
           node tests/ui-update.cjs
+          node tests/ui-navigation.cjs
           node tests/ui-monitor.cjs
           node tests/ui-network.cjs
           for script in scripts/*.sh; do bash -n "$script"; done

@@ -43,7 +43,10 @@ function refresh(initial = false) {
 }
 async function loadDashboard(initial) {
   try {
-    const [state, fleet] = await Promise.all([api('/api/state'),api('/api/fleet')]); csrf = state.csrf; authenticated = true;
+    const [state, fleet] = await Promise.all([api('/api/state'),api('/api/fleet')]);
+    const uiVersion = document.querySelector?.('meta[name="ftc-ui-version"]')?.content;
+    if (uiVersion && uiVersion !== state.version) {location.reload();return;}
+    csrf = state.csrf; authenticated = true;
     $('login').hidden = true; $('dashboard').hidden = false; $('logout').hidden = false;
     $('version').textContent = `v${state.version}`; $('installed-version').textContent = `Instalada: ${state.version}`; $('repository').textContent = state.repository;
     if (initial) {

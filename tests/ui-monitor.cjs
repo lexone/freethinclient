@@ -94,6 +94,13 @@ async function main(){
   });
   const timed=run("api('/timeout')");timeout();
   await assert.rejects(timed,/15 segundos/);
+  context.setTimeout=setTimeout;context.clearTimeout=clearTimeout;
+  let reloads=0;
+  context.location.reload=()=>reloads++;
+  context.document.querySelector=()=>({content:'0.2.0'});
+  network=async url=>response(url==='/api/state'?{...state,version:'0.2.3'}:fleet);
+  await run('refresh()');
+  assert.equal(reloads,1,'A new server version must reload the old interface');
   console.log('UI monitor: concurrent refresh, loading, failure, recovery, timeout and image-job controls passed');
 }
 main().catch(error=>{console.error(error);process.exitCode=1;});

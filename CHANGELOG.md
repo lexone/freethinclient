@@ -1,8 +1,14 @@
-## 0.2.1 - primeira release assinada para atualização remota
+# Changelog
+
+## 0.2.3
+
+- Corrige a ausência do botão Console remoto, registra a rota Rede e DNS e recarrega a interface quando a versão do servidor muda.
 
 ## 0.2.2
 
 - Log e etapas do update remoto, login lembrado por 30 dias e console noVNC pelo HTTPS do agente.
+
+## 0.2.1 - primeira release assinada para atualização remota
 
 - Publicação de pacote, manifesto e assinatura RSA no GitHub, com validação do download e instalação via API do painel em servidor descartável.
 - Inicialização automática e parâmetros validados por aplicativo, modos janela/tela inteira/quiosque e RDP com destino fixo ou informado ao conectar.

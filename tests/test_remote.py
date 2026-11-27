@@ -62,6 +62,16 @@ class RelayTests(unittest.TestCase):
 
 
 class RemoteApiTests(test_core.PanelTests):
+    def test_login_page_contains_controls_and_actual_ui_version(self):
+        import urllib.request
+        from app.server import VERSION
+        with urllib.request.urlopen(self.url + '/') as response:
+            page=response.read().decode()
+        self.assertIn('content="'+VERSION+'"',page)
+        self.assertNotIn('__FTC_UI_VERSION__',page)
+        self.assertIn('id="remember-login"',page)
+        self.assertIn('Manter conectado por 30 dias',page)
+
     def test_console_requires_admin_csrf_and_enrolled_agent(self):
         self.assertEqual(self.request('/api/remote/start',{'device':'anything'})[0],403)
         self.login()

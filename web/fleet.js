@@ -5,6 +5,7 @@ const pages = {
   machines: ['Cada máquina, no lugar certo.', 'Aprove os dispositivos e acompanhe a comunicação com o agente.'],
   groups: ['Um perfil. Todo o grupo.', 'Defina como as máquinas iniciam e o que seus usuários podem abrir.'],
   shortcuts: ['Seus atalhos, do seu jeito.', 'Escolha o que aparece no desktop de cada grupo.'],
+  network: ['Rede e DNS sob controle.', 'Configure DNS e permissões de rede dos grupos.'],
   boot: ['O começo de cada workspace.', 'Imagem Linux e arquivos para inicializar seus thin clients.'],
   desktop: ['Um espaço com a sua identidade.', 'Desktop azul, ícones claros e o wallpaper da sua organização.'],
   updates: ['Seu ambiente em dia.', 'Atualizações assinadas com backup e recuperação.'],
@@ -64,6 +65,12 @@ function renderDevices(force = false) {
     controls.append(name, select, actionButton(device.approved ? 'Mover / aplicar' : 'Aprovar', async () => {
       try {await api('/api/devices/assign',{id:device.id,group_id:select.value,name:name.value});await refresh();notify('Perfil liberado. O agente recebe as configurações na próxima comunicação.');}catch(error){notify(error.message,true);}
     },false));
+    if (device.approved && device.online && remoteAdmin) {
+      controls.append(actionButton('Console remoto', () => {
+        if (window.openRemoteConsole) window.openRemoteConsole(device);
+        else notify('O console ainda está carregando. Tente novamente.', true);
+      }));
+    }
     if (device.approved) for (const [action,label] of [['reapply','Reaplicar'],['reboot','Reiniciar'],['poweroff','Desligar']]) {
       controls.append(actionButton(label, async () => {
         if (action !== 'reapply' && !confirm(label + ' a máquina ' + device.name + '? A sessão do usuário será interrompida.')) return;

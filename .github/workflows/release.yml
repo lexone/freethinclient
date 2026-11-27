@@ -46,6 +46,7 @@ jobs:
           node tests/ui-network.cjs
           node tests/ui-remote.cjs
           node tests/ui-update.cjs
+          node tests/ui-navigation.cjs
       - name: Build signed package and verify exact bytes
         env:
           RELEASE_PRIVATE_KEY: ${{ secrets.RELEASE_PRIVATE_KEY }}

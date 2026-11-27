@@ -133,7 +133,10 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html", "/app.js", "/fleet.js", "/images.js", "/shortcuts.js", "/network.js", "/remote.js", "/remote-channel.js", "/style.css", "/blue.css"):
             file = BASE / "web" / ("index.html" if path == "/" else path[1:])
             mime = "text/html; charset=utf-8" if file.suffix == ".html" else "text/javascript" if file.suffix == ".js" else "text/css"
-            return self.reply(200, file.read_bytes(), mime=mime)
+            raw = file.read_bytes()
+            if file.suffix == '.html':
+                raw = raw.replace(b'__FTC_UI_VERSION__', VERSION.encode())
+            return self.reply(200, raw, mime=mime)
         session = self.session()
         if not session:
             return self.reply(401, {"error": "Entre no painel."})
