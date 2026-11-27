@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=FreeThinClient Device Information
+Exec=/usr/bin/python3 /usr/local/lib/freethinclient/device_info.py
+Terminal=false
+OnlyShowIn=XFCE;
+X-GNOME-Autostart-enabled=true

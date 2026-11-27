@@ -1,3 +1,67 @@
+# Changelog
+
+## 0.2.6
+
+- Corrige a tela vazia no console VNC: permite imagens data: na diretiva img-src da CSP, utilizadas pelos trechos Tight JPEG/PNG do noVNC. Teste de pixels JPEG no Chrome reproduz a falha antes da correção e valida a imagem depois.
+
+## 0.2.5
+
+- Estado real de negociação VNC, tratamento de erros do decodificador, diagnóstico de tráfego/resolução e teste de pixels no Chrome com x11vnc real.
+
+## 0.2.4
+
+- Corrige a travessia do diretório da senha temporária do VNC sob UMask=0077 e preserva o motivo de falha no console.
+
+## 0.2.3
+
+- Corrige a ausência do botão Console remoto, registra a rota Rede e DNS e recarrega a interface quando a versão do servidor muda.
+
+## 0.2.2
+
+- Log e etapas do update remoto, login lembrado por 30 dias e console noVNC pelo HTTPS do agente.
+
+## 0.2.1 - primeira release assinada para atualização remota
+
+- Publicação de pacote, manifesto e assinatura RSA no GitHub, com validação do download e instalação via API do painel em servidor descartável.
+- Inicialização automática e parâmetros validados por aplicativo, modos janela/tela inteira/quiosque e RDP com destino fixo ou informado ao conectar.
+- Aba Rede e DNS, controle de permissões de rede/Wi-Fi e diagnóstico local de conectividade.
+- DNS por grupo aplicado pelo agente e resultado informado ao painel; correção do parâmetro ip=dhcp no boot Debian Live.
+
+- Reparação das dependências GIO/XDG na imagem e atualização do desktop/barra sem corrida de encerramento.
+
+- Quadro no desktop com nome do painel e IPv4 atual, configurável por grupo e oculto no quiosque.
+
+- Aba Atalhos e ações por grupo com nomes, URLs HTTPS, ícones e visibilidade.
+- Ações opcionais de desligar/reiniciar com confirmação configurável e polkit restrito.
+- Atalhos web gerenciados são removidos ao desabilitar/excluir e ficam ocultos no quiosque.
+
+- Manutenção de imagem no portal: versões, Linux, Chromium/Chrome, Citrix Workspace e rollback.
+- Serviço root separado com ações fixas, staging, publicação versionada e auditoria.
+- Atalhos gerenciados recebem o checksum de confiança específico do XFCE.
+- Banner de boot FREETHINCLIENT e Copyright © 2026 Everton S Oliveira no initrd.
+
+- Desktop com atalhos selecionáveis, ícones do sistema e barra configuráveis por grupo.
+- Quiosque com navegador, portal Citrix ou RDP e opção de tela cheia no navegador.
+- Wallpaper e ícones em PNG; fallback de propriedades XFCE e diretório XDG localizado.
+- Atualização da imagem PXE existente com backup sem recompilar o Debian.
+
+- Indicador de consulta de máquinas, verificação manual, última resposta e falhas de comunicação.
+
+- Contas individuais no painel: administrador e operador, edição, senha e desativação.
+- Preservação do admin instalado e revogação de sessões ao alterar uma conta.
+- Auditoria com usuário, IP e filtro; proteção do último administrador ativo.
+- Nome da máquina editável junto à aprovação e orientação sobre cadastro após o boot.
+
+## 0.2.0 — piloto Blue Workspace
+
+- Navegação por abas com teclado, histórico e edição preservada.
+- Grupos e perfis desktop, navegador, quiosque, Citrix e RDP.
+- Aprovação de máquinas, credenciais individuais, heartbeat e comandos com confirmação.
+- Recadastro opcional de clientes sem disco pelo MAC em rede de boot confiável.
+- Desktop azul e ícones; receita de ISO Debian 12 e publicação PXE.
+- Atualização local com backup/rollback e testes de isolamento entre agentes.
+- ISO e boot físico ainda precisam ser compilados/homologados no ambiente Linux.
+
 # Histórico
 
 ## 0.1.0

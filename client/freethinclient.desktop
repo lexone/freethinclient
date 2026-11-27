@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=FreeThinClient Workspace
+Exec=/usr/bin/python3 /usr/local/lib/freethinclient/session.py
+Terminal=false
+X-GNOME-Autostart-enabled=true

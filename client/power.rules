@@ -1,0 +1,7 @@
+// Fixed local-session power actions only. No sudo or arbitrary unit management.
+polkit.addRule(function(action, subject) {
+    if (subject.user === "thinclient" && subject.local && subject.active &&
+        (action.id === "org.freedesktop.login1.power-off" || action.id === "org.freedesktop.login1.reboot")) {
+        return polkit.Result.YES;
+    }
+});

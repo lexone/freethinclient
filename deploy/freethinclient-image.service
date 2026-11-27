@@ -1,0 +1,25 @@
+[Unit]
+Description=FreeThinClient PXE image and application maintenance
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+# Preserve credential-switch capabilities across exec with NoNewPrivileges.
+AmbientCapabilities=CAP_SETUID CAP_SETGID
+WorkingDirectory=/opt/freethinclient/current
+ExecStart=/usr/bin/python3 -B -m app.image_worker
+TimeoutStartSec=7200
+KillMode=control-group
+UMask=0022
+NoNewPrivileges=true
+PrivateTmp=true
+PrivateDevices=true
+PrivateMounts=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/srv/freethinclient/boot /var/lib/freethinclient /var/lib/freethinclient-image
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true

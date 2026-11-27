@@ -1,0 +1,18 @@
+[Unit]
+Description=FreeThinClient device agent
+After=network-online.target
+Wants=network-online.target
+[Service]
+ExecStart=/usr/bin/python3 /usr/local/lib/freethinclient/agent.py
+Restart=always
+RestartSec=10
+UMask=0077
+NoNewPrivileges=true
+# On-demand x11vnc needs the existing X11 socket and read-only Xauthority.
+PrivateTmp=false
+ProtectHome=read-only
+ProtectSystem=strict
+ReadWritePaths=/var/lib/freethinclient-client /etc/NetworkManager/conf.d
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX AF_NETLINK
+[Install]
+WantedBy=multi-user.target

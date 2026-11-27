@@ -30,11 +30,12 @@ def main():
     args.output.mkdir(parents=True, exist_ok=True)
     package = args.output / f"freethinclient-{version}.tar.gz"
     with tarfile.open(package, "w:gz") as archive:
-        for name in ("VERSION", "README.md", "CHANGELOG.md", "SECURITY.md", "install.sh", "app", "web", "scripts", "deploy", "docs", "tests"):
+        for name in ("VERSION", "README.md", "CHANGELOG.md", "SECURITY.md", "install.sh", "app", "web", "client", "scripts", "deploy", "docs", "tests"):
             path = ROOT / name
             files = sorted(path.rglob("*")) if path.is_dir() else [path]
             for file in files:
-                if file.is_file() and not file.is_symlink() and "__pycache__" not in file.parts and file.suffix not in (".pyc", ".pem", ".key", ".env"):
+                public_key = file.relative_to(ROOT).as_posix() == "deploy/release-public.pem"
+                if file.is_file() and not file.is_symlink() and "__pycache__" not in file.parts and (public_key or file.suffix not in (".pyc", ".pem", ".key", ".env")):
                     archive.add(file, arcname=file.relative_to(ROOT).as_posix(), recursive=False)
     data = {"schema": 1, "repository": args.repository, "version": version,
             "minimum_version": args.minimum_version, "platform": "ubuntu-24.04-amd64", "state_schema": 1,

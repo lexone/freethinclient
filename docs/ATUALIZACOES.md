@@ -2,15 +2,24 @@
 
 ## Preparar a primeira publicação
 
-O instalador gera uma chave RSA de 3072 bits no servidor. Somente a pública fica
-disponível para verificação; a privada permanece em
-`/root/freethinclient-signing/release-private.pem` (0600).
+O instalador oficial inclui deploy/release-public.pem e distribui somente essa
+chave pública para /etc/freethinclient/release-public.pem em cada servidor.
+Instalações novas não geram chaves privadas de assinatura. A chave privada do
+publicador original permanece em /root/freethinclient-signing/release-private.pem
+(0600) e no secret de publicação; ela não deve ser copiada para consumidores.
+Instalações existentes preservam a chave pública já configurada.
+
+Para um publicador/repositório próprio, use --repository DONO/NOME e
+--release-public-key /caminho/chave-publica.pem na instalação. O instalador exige
+uma chave explícita para outro repositório. Não substitua a pública de um servidor
+existente apenas para aceitar uma assinatura desconhecida; confirme a origem.
 
 1. Faça backup criptografado da privada em um cofre.
 2. No GitHub, crie o environment **release** e configure revisores obrigatórios.
 3. Configure o secret **RELEASE_PRIVATE_KEY** nesse environment com o PEM
    completo da chave privada do servidor. Nunca cole a chave no chat ou no git.
 4. A chave pública fixada no servidor deve corresponder à privada usada no workflow.
+   O workflow também compara a chave do secret à pública oficial incluída no instalador.
 
 Com GitHub CLI autenticado no servidor, é possível enviar sem exibir a chave:
 
@@ -95,3 +104,35 @@ A chave pública nunca é trocada automaticamente pelo pacote. Gere a nova chave
 fora do git, distribua a nova pública por acesso administrativo autenticado,
 configure a nova privada no environment e só então publique a próxima release.
 Uma perda da chave privada exige esse procedimento, não desativação da assinatura.
+
+
+## Publicação e teste da release 0.2.1
+
+O workflow também inicia em um push para release/vX.Y.Z. O nome da branch deve
+corresponder exatamente ao VERSION. A chave continua no environment release e
+as proteções/revisores configurados nesse environment continuam sendo exigidos.
+Os três assets são verificados localmente com a chave pública derivada, enviados
+primeiro a um draft e então publicados como release estável. O workflow não
+substitui uma release estável já existente nem permite reutilizar uma versão em
+outro commit.
+
+Após publicar, um Ubuntu 24.04 descartável é instalado com o baseline 0.2.0. O teste
+usa o token temporário do job e a chave pública do publicador para consultar e
+instalar a release real do GitHub por meio da API do painel. Valida autenticação,
+CSRF, permissões, assinatura, SHA-256, backup, saúde, persistência e novo login.
+Depois executa o teste de falha de saúde e rollback com pacotes de teste somente
+no contêiner; pacotes defeituosos não são publicados. Se uma publicação nova
+falhar, a release é marcada como prerelease e deixa de ser oferecida pelo updater.
+Esse teste não modifica nem valida a VM física do usuário.
+
+No servidor instalado, uma verificação adicional sem instalar ou reiniciar pode
+ser executada após receber os scripts desta versão:
+
+```bash
+sudo python3 /opt/freethinclient/current/scripts/verify-remote-release.py --expected-version 0.2.1
+```
+
+A saída contém apenas versão, resultado da verificação e fingerprint da chave
+pública; não inclui token ou chave privada. Para o teste real na VM, use a aba
+Atualizações, confira a assinatura, aplique 0.2.1 e recarregue/entre novamente.
+A imagem Linux continua tendo seu próprio fluxo em Imagens e boot.

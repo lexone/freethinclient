@@ -1,0 +1,15 @@
+// Only the active local thinclient seat can edit network settings, when its root-owned profile allows it.
+polkit.addRule(function(action, subject) {
+    var prefix = "org.freedesktop.NetworkManager.";
+    if (subject.user !== "thinclient" || action.id.indexOf(prefix) !== 0) return;
+    if (!subject.local || !subject.active) return polkit.Result.NO;
+    var allowed = ["enable-disable-network", "enable-disable-wifi", "network-control",
+                   "wifi.scan", "settings.modify.own", "settings.modify.system"];
+    if (allowed.indexOf(action.id.slice(prefix.length)) < 0) return polkit.Result.NO;
+    try {
+        var profile = JSON.parse(polkit.spawn(["/usr/bin/cat", "/var/lib/freethinclient-client/profile.json"]));
+        if (profile.approved === true && profile.allow_network_settings === true)
+            return polkit.Result.YES;
+    } catch (error) {}
+    return polkit.Result.NO;
+});
